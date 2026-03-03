@@ -1,15 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
+    <meta charset="UTF-8">
     <title>Peregrinas Master</title>
     <style>
-        body { background: #000080; color: white; text-align: center; font-family: sans-serif; padding: 50px; }
-        .btn { background: #FFD700; color: black; padding: 20px; border-radius: 10px; font-weight: bold; display: block; margin: 20px auto; text-decoration: none; width: 200px; }
+        body { background: #000033; color: white; text-align: center; font-family: sans-serif; padding-top: 100px; }
+        .btn-amarelo { background: #FFD700; color: black; padding: 20px 40px; border-radius: 15px; font-weight: bold; font-size: 20px; text-decoration: none; display: inline-block; margin-top: 30px; }
     </style>
 </head>
 <body>
     <h1>Peregrinas - Gestão Master Ativa 🚀</h1>
-    <p>Conexão com Galaxy S20 FE Confirmada!</p>
-    <a href="#" class="btn">ESTATÍSTICAS MASTER 🚀</a>
+    <p>Conexão com Galaxy S20 FE: OK!</p>
+    <a href="#" class="btn-amarelo">ESTATÍSTICAS MASTER 🚀</a>
 </body>
 </html>
