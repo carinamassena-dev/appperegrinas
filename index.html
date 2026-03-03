@@ -3,39 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Peregrinas Master 🚀</title>
-    <style>
-        body { background: #000033; color: white; font-family: sans-serif; margin: 0; padding: 20px; text-align: center; }
-        .card { background: white; color: black; border-radius: 15px; padding: 15px; margin-bottom: 20px; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        h2 { color: #000033; margin-top: 0; border-bottom: 2px solid #FFD700; padding-bottom: 5px; }
-        .btn-zap { background: #25D366; color: white; padding: 5px 10px; border-radius: 20px; text-decoration: none; font-size: 12px; float: right; font-weight: bold; }
-        .ranking-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ddd; }
-        .lost-sheep-item { padding: 10px 0; border-bottom: 1px solid #eee; }
-        .badge { background: #FFD700; color: black; padding: 2px 8px; border-radius: 10px; font-weight: bold; font-size: 14px; }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Peregrinas App</title>
 </head>
-<body>
-    <h1 style="font-size: 22px;">Peregrinas Master 🚀</h1>
-    <p style="font-size: 14px; opacity: 0.8;">Gestão das 19 Líderes e 90 Discípulas</p>
+<body class="bg-gray-50 font-sans">
+    <header class="bg-white shadow-sm p-4 border-b border-gray-200">
+        <h1 class="text-xl font-bold text-center text-gray-800 tracking-wide uppercase">PEREGRINAS</h1>
+    </header>
 
-    <div class="card">
-        <h2>🏆 Ranking de Fidelidade</h2>
-        <div id="ranking-list">
-            <p style="font-size: 12px; color: #666;">Carregando dados das líderes...</p>
+    <main class="p-4 max-w-md mx-auto">
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+            <h2 class="text-lg font-semibold text-gray-700">Boa tarde, Peregrina! 🌸</h2>
+            <p class="text-sm text-gray-500">Gestão de 19 Líderes e 90 Discípulas</p>
         </div>
-    </div>
 
-    <div class="card">
-        <h2 style="color: #d32f2f;">🐑 Ovelhas Perdidas (+15 dias)</h2>
-        <div id="lost-sheep-list">
-            <p style="font-size: 12px; color: #666;">Buscando discípulas ausentes...</p>
+        <div class="space-y-3">
+            <button class="w-full bg-black text-white py-4 rounded-xl font-bold flex justify-between px-6 items-center shadow-lg active:scale-95 transition">
+                <span>GERENCIAR REDE</span>
+                <span>➔</span>
+            </button>
+            
+            <button class="w-full bg-yellow-400 text-black py-4 rounded-xl font-bold flex justify-between px-6 items-center shadow-lg active:scale-95 transition">
+                <span>ESTATÍSTICAS MASTER 🚀</span>
+                <span class="bg-white/50 px-2 py-1 rounded text-xs">NOVO</span>
+            </button>
         </div>
-    </div>
 
-    <script>
-        // Aqui o Antigravity vai injetar a conexão com o seu Supabase
-        // Para este teste visual, deixei a estrutura pronta para receber os dados
-        console.log("Sistema Peregrinas Pronto para os dados do Supabase!");
-    </script>
+        <div id="lista-fidelidade" class="mt-8">
+            <h3 class="text-xs font-bold text-gray-400 uppercase mb-3">Ranking de Líderes</h3>
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center text-gray-400 text-sm italic">
+                Sincronizando com Supabase...
+            </div>
+        </div>
+    </main>
 </body>
 </html>
