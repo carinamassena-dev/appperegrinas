@@ -1,13 +1,15 @@
-export default function Home() {
-  return (
-    <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'sans-serif' }}>
-      <h1>Peregrinas - Gestão Master Ativa 🚀</h1>
-      <button style={{ background: 'black', color: 'white', padding: '15px', borderRadius: '10px', width: '100%', marginBottom: '10px' }}>
-        GERENCIAR REDE
-      </button>
-      <button style={{ background: '#FFD700', color: 'black', padding: '15px', borderRadius: '10px', width: '100%', fontWeight: 'bold' }}>
-        ESTATÍSTICAS MASTER 🚀
-      </button>
-    </div>
-  );
-}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Peregrinas Master</title>
+    <style>
+        body { background: #000080; color: white; text-align: center; font-family: sans-serif; padding: 50px; }
+        .btn { background: #FFD700; color: black; padding: 20px; border-radius: 10px; font-weight: bold; display: block; margin: 20px auto; text-decoration: none; width: 200px; }
+    </style>
+</head>
+<body>
+    <h1>Peregrinas - Gestão Master Ativa 🚀</h1>
+    <p>Conexão com Galaxy S20 FE Confirmada!</p>
+    <a href="#" class="btn">ESTATÍSTICAS MASTER 🚀</a>
+</body>
+</html>
