@@ -1,0 +1,283 @@
+/**
+ * Centralized Data Service
+ * ALL reads/writes go through Supabase. No localStorage dependency.
+ * localStorage is ONLY used for `current_user` session cache (handled in App.tsx).
+ */
+import { supabase } from './supabaseClient';
+import { supabaseService } from './supabaseService';
+import { logAction } from './auditService';
+
+const isSupabaseReady = () => !!supabase;
+
+type TableMap = {
+    table: string;
+};
+
+const TABLES: Record<string, TableMap> = {
+    disciples: { table: 'peregrinas' },
+    finance: { table: 'financeiro' },
+    harvest: { table: 'colheita' },
+    events: { table: 'eventos' },
+    cellMeetings: { table: 'atas' },
+    feed: { table: 'feed' },
+    tickets: { table: 'tickets' },
+    users: { table: 'usuarios' },
+    leaders: { table: 'lideres' },
+    settings: { table: 'configuracoes' },
+    auditLogs: { table: 'audit_logs' },
+    pendingRegistrations: { table: 'pending_registrations' },
+    intercessions: { table: 'intercessoes' },
+    attendance: { table: 'presencas' }
+};
+
+/**
+ * Safely log an error to the audit system.
+ * Avoids infinite recursion by NOT logging audit errors about the auditLogs module itself.
+ */
+function safeLogError(module: string, action: string, errorMsg: string) {
+    if (module === 'auditLogs') {
+        // Only console.error to avoid infinite recursion
+        console.error(`[DataService] ${action}: ${errorMsg}`);
+        return;
+    }
+    logAction('SISTEMA', action, errorMsg, 'ERRO').catch(() => {
+        // If even audit logging fails, just console it
+        console.error(`[DataService] Falha ao registrar log de auditoria: ${errorMsg}`);
+    });
+}
+
+/**
+ * Cache Local para mitigar Egress Loop (24 horas)
+ */
+const CACHE_LIFETIME = 24 * 60 * 60 * 1000;
+const memoryCache: Record<string, { data: any[], timestamp: number }> = {};
+
+/**
+ * Load data: Supabase ONLY
+ */
+export async function loadData<T>(module: keyof typeof TABLES): Promise<T[]> {
+    const { table } = TABLES[module];
+
+    if (!isSupabaseReady()) {
+        console.error(`[DataService] Supabase não está configurado. Impossível carregar ${module}.`);
+        return [];
+    }
+
+    const now = Date.now();
+    if (memoryCache[module] && (now - memoryCache[module].timestamp < CACHE_LIFETIME)) {
+        console.log(`[Cache Hit] Poupando Egress de: ${module}`);
+        return memoryCache[module].data as T[];
+    }
+
+    try {
+        const data = await supabaseService.getAll(table);
+        memoryCache[module] = { data: data || [], timestamp: now };
+        return (data || []) as T[];
+    } catch (err: any) {
+        const errorMsg = `${err?.message || err} - Code: ${err?.code || 'N/A'}`;
+        console.error(`[DataService] Erro ao carregar ${module} do Supabase:`, err);
+        return [];
+    }
+}
+
+/**
+ * Optimized Fetch specifically for Disciples List (avoids downloading Base64 images)
+ */
+export async function loadDisciplesList(): Promise<any[]> {
+    if (!isSupabaseReady()) return [];
+
+    const now = Date.now();
+
+    // Check Local Storage Cache first
+    const cachedItemStr = localStorage.getItem('cached_disciplesList');
+    if (cachedItemStr) {
+        try {
+            const cachedItem = JSON.parse(cachedItemStr);
+            if (now - cachedItem.timestamp < CACHE_LIFETIME) {
+                console.log(`[Cache Hit] Poupando Egress de: disciplesList (via localStorage)`);
+                // Populate memory cache to avoid parsing again if called rapidly
+                memoryCache['disciplesList'] = cachedItem;
+                return cachedItem.data;
+            } else {
+                localStorage.removeItem('cached_disciplesList');
+            }
+        } catch (e) {
+            localStorage.removeItem('cached_disciplesList');
+        }
+    }
+
+    if (memoryCache['disciplesList'] && (now - memoryCache['disciplesList'].timestamp < CACHE_LIFETIME)) {
+        console.log(`[Cache Hit] Poupando Egress de: disciplesList`);
+        return memoryCache['disciplesList'].data;
+    }
+
+    try {
+        console.log('[Data Fetch] Carregando lista de discípulos do banco...');
+        const data = await supabaseService.getDisciplesList();
+        const cacheObj = { data: data || [], timestamp: now };
+        memoryCache['disciplesList'] = cacheObj;
+
+        // Save to Local Storage for next browser session
+        try {
+            localStorage.setItem('cached_disciplesList', JSON.stringify(cacheObj));
+        } catch (e) {
+            console.warn('[Cache] Falha ao salvar no localStorage (possível limite de quota)', e);
+        }
+
+        return data;
+    } catch (err: any) {
+        console.error('[DataService] Erro ao carregar lista de discípulas:', err);
+        return [];
+    }
+}
+
+/**
+ * Funções de Otimização Isoladas (Buscas Diretas contra o Supabase)
+ */
+export async function searchDisciplesByName(term: string): Promise<any[]> {
+    return await supabaseService.searchDisciplesByName(term);
+}
+
+export async function getTodayBirthdays(): Promise<any[]> {
+    return await supabaseService.getTodayBirthdays();
+}
+
+export async function getDiscipleByName(name: string): Promise<any | null> {
+    return await supabaseService.getDiscipleByName(name);
+}
+
+/**
+ * Fetch a full Disciple record by ID (used for editing/viewing details)
+ */
+export async function loadDiscipleFull(id: string): Promise<any | null> {
+    if (!isSupabaseReady()) return null;
+    try {
+        return await supabaseService.getDiscipleById(id);
+    } catch (err: any) {
+        console.error(`[DataService] Erro ao carregar discípula inteira (${id}):`, err);
+        return null;
+    }
+}
+
+/**
+ * Save a single record to Supabase
+ */
+export async function saveRecord(module: keyof typeof TABLES, item: any): Promise<void> {
+    const { table } = TABLES[module];
+
+    if (!isSupabaseReady()) {
+        console.error(`[DataService] Supabase não configurado. Impossível salvar em ${module}.`);
+        return;
+    }
+
+    try {
+        await supabaseService.upsert(table, item);
+        delete memoryCache[module];
+        if (module === 'disciples') {
+            delete memoryCache['disciplesList'];
+            localStorage.removeItem('cached_disciplesList'); // Clear cache to allow refresh on next call
+        }
+    } catch (err) {
+        console.error(`[DataService] Erro ao salvar em ${module}:`, err);
+    }
+}
+
+/**
+ * Save an entire list at once: syncs the changed item to Supabase
+ */
+export async function saveList(module: keyof typeof TABLES, _list: any[], changedItem?: any): Promise<void> {
+    if (!isSupabaseReady() || !changedItem) return;
+
+    const { table } = TABLES[module];
+
+    try {
+        await supabaseService.upsert(table, changedItem);
+        delete memoryCache[module];
+        delete memoryCache[`${module}List`];
+    } catch (err) {
+        console.error(`[DataService] Erro ao salvar lista em ${module}:`, err);
+    }
+}
+
+/**
+ * Delete a record from Supabase
+ */
+export async function deleteRecord(module: keyof typeof TABLES, id: string): Promise<void> {
+    const { table } = TABLES[module];
+
+    if (!isSupabaseReady()) {
+        console.error(`[DataService] Supabase não configurado. Impossível deletar de ${module}.`);
+        return;
+    }
+
+    try {
+        await supabaseService.delete(table, id);
+        delete memoryCache[module];
+        delete memoryCache[`${module}List`];
+    } catch (err) {
+        console.error(`[DataService] Erro ao deletar de ${module}:`, err);
+    }
+}
+
+/**
+ * Generate a complete JSON backup of the entire database
+ */
+export async function generateFullSystemBackup(): Promise<any> {
+    if (!isSupabaseReady()) {
+        console.error('[DataService] Supabase não configurado para backup.');
+        return null;
+    }
+
+    const allData: Record<string, any[]> = {};
+    const modules = Object.keys(TABLES) as (keyof typeof TABLES)[];
+
+    for (const mod of modules) {
+        const { table } = TABLES[mod];
+        try {
+            console.log(`[Backup] Baixando módulo: ${mod}`);
+            const data = await supabaseService.getFullTableBackup(table);
+            allData[mod] = data;
+        } catch (err) {
+            console.error(`[Backup] Erro ao baixar módulo ${mod}:`, err);
+            allData[mod] = [];
+        }
+    }
+
+    return {
+        ...allData,
+        exportedAt: new Date().toISOString()
+    };
+}
+
+// Check-ins: Save a batch of attendances to minimize Egress
+export async function saveAttendanceBatch(records: { id_discipula: string; id_lider: string; data_presenca: string }[]): Promise<void> {
+    if (!records || records.length === 0) return;
+
+    try {
+        await supabaseService.saveAttendanceBatch(records);
+        // Clear potential dashboard caches related to attendance
+        delete memoryCache['attendance_weekly'];
+    } catch (err: any) {
+        console.error('[DataService] Erro ao salvar lote de check-ins:', err);
+        throw err;
+    }
+}
+
+// Check-ins: Get weekly total
+export async function getWeeklyAttendanceTotal(): Promise<number> {
+    const cacheKey = 'attendance_weekly';
+    const now = Date.now();
+
+    if (memoryCache[cacheKey] && (now - memoryCache[cacheKey].timestamp < CACHE_LIFETIME)) {
+        return memoryCache[cacheKey].data as any as number;
+    }
+
+    try {
+        const total = await supabaseService.getWeeklyAttendanceCount();
+        memoryCache[cacheKey] = { data: total as any, timestamp: now };
+        return total;
+    } catch (err) {
+        console.error("Erro ao buscar total de check-ins semanais", err);
+        return 0;
+    }
+}
