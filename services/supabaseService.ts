@@ -329,6 +329,20 @@ export const supabaseService = {
         }
 
         return count || 0;
+    },
+
+    // G12 Lineage Recursive Fetch (from View)
+    async getLinhagem() {
+        if (!supabase) return [];
+        const { data, error } = await supabase
+            .from('v_linhagem_peregrinas')
+            .select('*');
+
+        if (error) {
+            console.error('[Supabase Error] v_linhagem_peregrinas:', error);
+            return [];
+        }
+        return data || [];
     }
 }
 

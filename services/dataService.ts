@@ -281,3 +281,26 @@ export async function getWeeklyAttendanceTotal(): Promise<number> {
         return 0;
     }
 }
+
+/**
+ * Load G12 Lineage with caching
+ */
+export async function loadLinhagem(): Promise<any[]> {
+    if (!isSupabaseReady()) return [];
+
+    const now = Date.now();
+    const module = 'linhagem';
+
+    if (memoryCache[module] && (now - memoryCache[module].timestamp < CACHE_LIFETIME)) {
+        return memoryCache[module].data;
+    }
+
+    try {
+        const data = await supabaseService.getLinhagem();
+        memoryCache[module] = { data: data || [], timestamp: now };
+        return data;
+    } catch (err) {
+        console.error('[DataService] Erro ao carregar linhagem:', err);
+        return [];
+    }
+}

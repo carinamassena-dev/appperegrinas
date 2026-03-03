@@ -11,7 +11,7 @@ import useSWR from 'swr';
 import { AuthContext } from '../App';
 import { draftService } from '../services/draftService';
 import { sendDataToSheet } from '../services/googleSheetsService';
-import { loadDisciplesList, loadDiscipleFull, saveRecord, deleteRecord, loadData, saveAttendanceBatch, searchDisciplesByName } from '../services/dataService';
+import { loadDisciplesList, loadDiscipleFull, saveRecord, deleteRecord, loadData, saveAttendanceBatch, searchDisciplesByName, loadLinhagem } from '../services/dataService';
 import { supabase } from '../services/supabaseClient';
 import { supabaseService } from '../services/supabaseService';
 import { Disciple, BaptismStatus, CDLevel, Leader } from '../types';
@@ -25,7 +25,7 @@ const Disciples: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'folder'>('folder');
+  const [viewMode, setViewMode] = useState<'grid' | 'folder' | 'tree'>('folder');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
 
@@ -51,6 +51,10 @@ const Disciples: React.FC = () => {
     console.timeEnd('fetch-cadastros');
     return data as Disciple[];
   }, { revalidateOnFocus: true });
+
+  const { data: treeData = [], isLoading: isLoadingTree } = useSWR(viewMode === 'tree' ? '/api/linhagem' : null, async () => {
+    return await loadLinhagem();
+  });
 
   const { data: pendingRequests = [], mutate: mutatePending } = useSWR('/api/pendingRegistrations', async () => {
     try {
@@ -571,6 +575,13 @@ const Disciples: React.FC = () => {
             >
               <Bookmark size={20} />
             </button>
+            <button
+              onClick={() => setViewMode('tree')}
+              className={`p-3.5 rounded-xl border transition-all ${viewMode === 'tree' ? 'bg-black text-white' : 'bg-gray-50 text-gray-400'}`}
+              title="Árvore G12"
+            >
+              <Activity size={20} />
+            </button>
 
             <select
               value={filterStatus}
@@ -670,7 +681,7 @@ const Disciples: React.FC = () => {
             ))}
           </div>
         </div>
-      ) : (
+      ) : viewMode === 'folder' ? (
         <div className="space-y-4 px-1 text-left">
           {Object.keys(groupedByLeader).sort().map(leader => {
             const isExpanded = expandedFolders[leader] === true; // false por padrão
@@ -756,6 +767,33 @@ const Disciples: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      ) : (
+        <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border shadow-sm mx-1 animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="p-3 bg-lime-100 text-lime-600 rounded-2xl shadow-sm">
+              <Activity size={24} />
+            </div>
+            <div className="text-left">
+              <h2 className="text-xl font-black uppercase text-gray-900 tracking-tighter">Linhagem G12</h2>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Hierarquia Recursiva • Baixo Egress</p>
+            </div>
+          </div>
+
+          {isLoadingTree ? (
+            <div className="flex flex-col items-center justify-center py-10 space-y-4">
+              <Loader2 className="w-8 h-8 text-lime-500 animate-spin" />
+              <p className="text-gray-300 font-bold uppercase tracking-widest text-[10px]">Construindo Árvore...</p>
+            </div>
+          ) : treeData.length === 0 ? (
+            <div className="text-center py-10 text-gray-300 font-bold uppercase text-xs">Nenhum dado de linhagem encontrado.</div>
+          ) : (
+            <div className="space-y-2">
+              {treeData.filter((m: any) => m.nivel === 1).map((root: any) => (
+                <RecursiveTreeItem key={root.id} member={root} allMembers={treeData} level={1} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1386,5 +1424,76 @@ const SwitchField = ({ label, checked, onChange }: any) => (
     </div>
   </div>
 );
+
+// --- RECURSIVE TREE ITEM COMPONENT ---
+const RecursiveTreeItem = ({ member, allMembers, level }: { member: any, allMembers: any[], level: number }) => {
+  const children = allMembers.filter(m => m.lider_direta === member.nome);
+  const [isExpanded, setIsExpanded] = useState(level < 2);
+
+  return (
+    <div className={`text-left ${level > 1 ? 'ml-4 md:ml-8 border-l-2 border-lime-50/50 pl-4 py-1' : 'mb-4'}`}>
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer group ${level === 1 ? 'bg-gray-50 border border-gray-100 hover:bg-gray-100' : 'hover:bg-lime-50'
+          }`}
+      >
+        <div className="relative shrink-0">
+          {member.foto ? (
+            <img src={member.foto} className="w-10 h-10 rounded-xl object-cover shadow-sm border-2 border-white" />
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center text-gray-300 shadow-sm">
+              <UserCircle size={20} />
+            </div>
+          )}
+          {member.is_leader && (
+            <div className="absolute -top-1 -right-1 bg-lime-500 text-white w-4 h-4 rounded-full flex items-center justify-center shadow-sm border border-white">
+              <Star size={8} fill="currentColor" />
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h4 className={`font-black uppercase tracking-tight truncate ${level === 1 ? 'text-sm text-gray-900' : 'text-xs text-gray-700'}`}>
+              {member.nome}
+            </h4>
+            {member.status === 'Inativa' && (
+              <span className="bg-red-50 text-red-500 px-1.5 py-0.5 rounded-lg text-[7px] font-black uppercase">Inativa</span>
+            )}
+          </div>
+          <p className="text-[9px] text-gray-400 font-bold uppercase flex items-center gap-2">
+            <span>Nível {level}</span>
+            {member.whatsapp && (
+              <>
+                <span className="w-1 h-1 bg-gray-200 rounded-full" />
+                <span>{member.whatsapp}</span>
+              </>
+            )}
+            {children.length > 0 && (
+              <>
+                <span className="w-1 h-1 bg-gray-200 rounded-full" />
+                <span className="text-lime-600">{children.length} descendentes</span>
+              </>
+            )}
+          </p>
+        </div>
+
+        {children.length > 0 && (
+          <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''} text-gray-300 group-hover:text-lime-500`}>
+            <ChevronDown size={18} />
+          </div>
+        )}
+      </div>
+
+      {isExpanded && children.length > 0 && (
+        <div className="mt-1 space-y-1 animate-in slide-in-from-top-1">
+          {children.map(child => (
+            <RecursiveTreeItem key={child.id} member={child} allMembers={allMembers} level={level + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default Disciples;
