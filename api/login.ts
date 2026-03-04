@@ -61,8 +61,8 @@ export default async function handler(req: any, res: any) {
     try {
         // Tenta capturar as variáveis comuns do Next/Vite ou nativas da Vercel
         const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ofrwgukuoqbftdyzbfza.supabase.co';
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mcndndWt1b3FiZnRkeXpiZnphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MDM2NjksImV4cCI6MjA4ODE3OTY2OX0.igAsGDZA1QbZfPQW7i4V9jNBvu02Mds3Cs7-pLQ26MI';
-        const jwtSecret = process.env.JWT_SECRET || 'peregrinas-fallback-secret-for-dev-only-xpto';
+                const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
         // TRAVA OBRIGATÓRIA: Checagem de Variáveis Críticas
         if (!supabaseUrl || !supabaseKey) {
@@ -210,3 +210,4 @@ export default async function handler(req: any, res: any) {
         });
     }
 }
+
