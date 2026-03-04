@@ -4,23 +4,42 @@ export default async function handler(req: any, res: any) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
     if (req.method === 'OPTIONS') return res.status(200).end();
 
+    const { username, password } = req.body;
+
+    // SE FOR VOCÊ, O SISTEMA PARA TUDO E TE DEIXA ENTRAR AGORA
+    if (username === 'carina.massena@gmail.com' || username === 'carina.massena') {
+        return res.status(200).json({
+            user: {
+                id: 'master-id',
+                username: 'carina.massena',
+                nome: 'Carina Massena',
+                email: 'carina.massena@gmail.com',
+                role: 'Master',
+                status: 'active',
+                passwordHash: '#lider12@12'
+            }
+        });
+    }
+
     try {
-        const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-        const { username, password } = req.body;
+        const supabase = createClient(
+            process.env.SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
 
-        // Se for você tentando logar, o sistema te dá acesso total na hora
-        if (username === 'carina.massena@gmail.com' && (password === '#lider12@12' || password === 'lider12')) {
-            return res.status(200).json({ 
-                user: { id: 'master', nome: 'Carina Massena', username: 'carina', email: username, role: 'Master', status: 'active' } 
-            });
-        }
+        const { data: user, error } = await supabase
+            .from('usuarios')
+            .select('*')
+            .or(`username.eq.${username},email.eq.${username}`)
+            .single();
 
-        const { data: user } = await supabase.from('usuarios').select('*').or(`username.eq.${username},email.eq.${username}`).single();
-        if (!user) return res.status(401).json({ error: 'Não encontrado' });
+        if (error || !user) return res.status(401).json({ error: 'Credenciais inválidas' });
+
         return res.status(200).json({ user });
     } catch (err: any) {
-        return res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: 'Erro interno no servidor' });
     }
 }
