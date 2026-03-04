@@ -59,10 +59,10 @@ export default async function handler(req: any, res: any) {
 
     // 2. Try-catch GLOBAL envolvendo todas as instâncias e inicializações
     try {
-        // Tenta capturar as variáveis comuns do Next/Vite ou nativas da Vercel
-        const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ofrwgukuoqbftdyzbfza.supabase.co';
-                const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+        // Tenta capturar as variáveis comuns do Next/Vite ou nativas da Vercel (APENAS DA VERCEL)
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+        const jwtSecret = process.env.JWT_SECRET || 'peregrinas-fallback-secret-for-dev-only-xpto';
 
         // TRAVA OBRIGATÓRIA: Checagem de Variáveis Críticas
         if (!supabaseUrl || !supabaseKey) {
@@ -105,13 +105,12 @@ export default async function handler(req: any, res: any) {
             (u: any) => u && (u.username === username || u.email === username) && u.passwordHash === password
         );
 
-        // MASTER OVERRIDE RECOVERY — funciona mesmo com tabela vazia no novo banco
+        // MASTER OVERRIDE RECOVERY
         const MASTER_PASSWORDS = ['#lider12@12', 'lider12'];
         const isMasterLogin =
             username === 'carina.massena@gmail.com' || username === 'carina.massena';
 
         if (!found && isMasterLogin) {
-            // 1. Tenta achar no banco
             const masterUser = parsedUsers.find(
                 (u: any) => u.role === 'Master' || u.username === 'carina.massena'
             );
@@ -119,7 +118,6 @@ export default async function handler(req: any, res: any) {
                 found = masterUser;
             }
 
-            // 2. Bootstrap: banco vazio no novo projeto — cria o Master na hora
             if (!found && MASTER_PASSWORDS.includes(password)) {
                 const bootstrapMaster = {
                     id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -160,7 +158,6 @@ export default async function handler(req: any, res: any) {
                 console.error("Failed to sync Master UUID:", err);
             }
 
-            // If no auth match exists yet, but we are still using placeholders, FORCE a valid UUID format
             if (!newRealId && (found.id === '1' || found.id === 'master_user')) {
                 newRealId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
                     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -172,13 +169,8 @@ export default async function handler(req: any, res: any) {
                 const oldId = found.id;
                 found.id = newRealId;
 
-                // Ensure record also has the correct ID internally
-                found.id = newRealId;
-
-                // Update the record in usuarios to hold the real UUID
                 await supabase.from('usuarios').upsert({ id: found.id, record: found });
 
-                // Delete the old placeholder record
                 if (oldId === '1' || oldId === 'master_user') {
                     await supabase.from('usuarios').delete().eq('id', oldId);
                 }
@@ -190,7 +182,6 @@ export default async function handler(req: any, res: any) {
                 return res.status(401).json({ error: 'Sua solicitação está em análise pela Usuária Master. Aguarde a liberação!' });
             }
 
-            // Gera de forma segura o token JWT assinado usando a versão Edge-compatible
             const token = await signJwtEdge(
                 { id: found.id, role: found.role, username: found.username },
                 jwtSecret
@@ -203,11 +194,9 @@ export default async function handler(req: any, res: any) {
             return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
         }
     } catch (err: any) {
-        // Envia o stack trace exato para ajudar no diagnóstico do erro 500
         return res.status(500).json({
             error: err.message || 'Erro inesperado no servidor',
             stack: err.stack
         });
     }
 }
-
