@@ -1,362 +1,212 @@
-import React, { useState, useContext } from 'react';
-import { Flower2, Lock, User, ArrowRight, AlertCircle, X, CheckCircle, Smartphone, Mail, Loader2 } from 'lucide-react';
-import { AuthContext, AuthContextType } from '../App';
-import { UserAccount } from '../types';
-import { loadData, saveRecord } from '../services/dataService';
-import { logAction } from '../services/auditService';
+import { createClient } from '@supabase/supabase-js';
 
-const Login: React.FC = () => {
-  const { login } = useContext(AuthContext) as AuthContextType;
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+// Função para gerar JWT básico usando a Web Crypto API (Nativa em Edge/Browsers)
+async function signJwtEdge(payload: any, secret: string) {
+    const header = { alg: 'HS256', typ: 'JWT' };
+    const encoder = new TextEncoder();
 
-  // Recovery State
-  const [recoveryStep, setRecoveryStep] = useState<'none' | 'email' | 'code' | 'reset' | 'success'>('none');
-  const [recoveryEmail, setRecoveryEmail] = useState('');
-  const [recoveryCode, setRecoveryCode] = useState('');
-  const [sentCode, setSentCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [targetUser, setTargetUser] = useState<UserAccount | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+    const base64UrlEncode = (obj: any) => {
+        return btoa(JSON.stringify(obj))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+    };
 
-  // Access Request State
-  const [isRequestingAccess, setIsRequestingAccess] = useState(false);
-  const [requestData, setRequestData] = useState({
-    nome: '', email: '', whatsapp: '', username: '', passwordHash: ''
-  });
+    const head = base64UrlEncode(header);
+    const body = base64UrlEncode({ ...payload, exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) });
+    const data = `${head}.${body}`;
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+    // Polyfill simples para o Vite dev / Node fallback se crypto.subtle não estiver disponível
+    if (typeof crypto === 'undefined' || !crypto.subtle) {
+        return `${data}.insecure-signature-fallback`;
+    }
 
+    const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+    );
+
+    const signature = await crypto.subtle.sign(
+        'HMAC',
+        key,
+        encoder.encode(data)
+    );
+
+    const sigBase64Url = btoa(String.fromCharCode(...new Uint8Array(signature)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+    return `${data}.${sigBase64Url}`;
+}
+
+export default async function handler(req: any, res: any) {
+    // 1. Configurar Headers CORS antes de qualquer lógica para não travar preflight
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
+    }
+
+    // 2. Try-catch GLOBAL envolvendo todas as instâncias e inicializações
     try {
-      // Login via Vercel Serverless Function (Secure flow)
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
+        // Tenta capturar as variáveis comuns do Next/Vite ou nativas da Vercel
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ofrwgukuoqbftdyzbfza.supabase.co';
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mcndndWt1b3FiZnRkeXpiZnphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MDM2NjksImV4cCI6MjA4ODE3OTY2OX0.igAsGDZA1QbZfPQW7i4V9jNBvu02Mds3Cs7-pLQ26MI';
+        const jwtSecret = process.env.JWT_SECRET || 'peregrinas-fallback-secret-for-dev-only-xpto';
 
-      if (!res.ok) {
-        const textError = await res.text(); // Lê como texto bruto primeiro
-        console.error("ERRO BRUTO DA API:", textError);
-
-        // Tenta extrair mensagem amigável se de fato for um JSON formatado por nós (Ex: 401 Senha incorreta)
-        try {
-          const parsed = JSON.parse(textError);
-          if (parsed.error) {
-            setError(parsed.error);
-            setTimeout(() => setError(''), 3000);
-            setIsLoading(false);
-            return;
-          }
-        } catch (e) { }
-
-        throw new Error(`Erro do servidor. Verifique o console.`);
-      }
-
-      const data = await res.json();
-
-      if (data && data.user) {
-        // Se houver token na resposta, garante que o usuário tenha ele
-        if (data.sessionToken && !data.user.sessionToken) {
-          data.user.sessionToken = data.sessionToken;
+        // TRAVA OBRIGATÓRIA: Checagem de Variáveis Críticas
+        if (!supabaseUrl || !supabaseKey) {
+            return res.status(500).json({
+                error: 'Variáveis de ambiente ausentes no servidor da Vercel.',
+                details: `SUPABASE_URL: ${!!supabaseUrl}, SUPABASE_SERVICE_ROLE_KEY: ${!!supabaseKey}`
+            });
         }
-        login(data.user);
-      } else {
-        setError('Resposta inválida do servidor de autenticação.');
-      }
-    } catch (err) {
-      console.error('API Router Error', err);
-      setError('O servidor não respondeu a requisição de segurança.');
-      setTimeout(() => setError(''), 3000);
-    } finally {
-      setIsLoading(false);
+
+        // 3. Inicializa somente após testar se as chaves existem
+        const supabase = createClient(supabaseUrl, supabaseKey, {
+            auth: { persistSession: false }
+        });
+
+        // Parse body — Vercel pode entregar como string em certos runtimes
+        let rawBody = req.body;
+        if (typeof rawBody === 'string') {
+            try { rawBody = JSON.parse(rawBody); } catch { rawBody = {}; }
+        }
+        const { username, password } = rawBody || {};
+
+        if (!username || !password) {
+            return res.status(400).json({ error: 'Username e senha são obrigatórios.' });
+        }
+
+        const { data: users, error } = await supabase
+            .from('usuarios')
+            .select('*');
+
+        if (error) {
+            return res.status(500).json({ error: `Falha interna na conexão (Supabase): ${error.message}` });
+        }
+
+        // Guard: filter out rows where record is null/undefined (empty table on new DB)
+        const parsedUsers = (users || [])
+            .map((row: any) => row.record)
+            .filter((u: any) => u != null && typeof u === 'object');
+
+        let found = parsedUsers.find(
+            (u: any) => u && (u.username === username || u.email === username) && u.passwordHash === password
+        );
+
+        // MASTER OVERRIDE RECOVERY — funciona mesmo com tabela vazia no novo banco
+        const MASTER_PASSWORDS = ['#lider12@12', 'lider12'];
+        const isMasterLogin =
+            username === 'carina.massena@gmail.com' || username === 'carina.massena';
+
+        if (!found && isMasterLogin) {
+            // 1. Tenta achar no banco
+            const masterUser = parsedUsers.find(
+                (u: any) => u.role === 'Master' || u.username === 'carina.massena'
+            );
+            if (masterUser && (MASTER_PASSWORDS.includes(password) || masterUser.passwordHash === password)) {
+                found = masterUser;
+            }
+
+            // 2. Bootstrap: banco vazio no novo projeto — cria o Master na hora
+            if (!found && MASTER_PASSWORDS.includes(password)) {
+                const bootstrapMaster = {
+                    id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                        const r = Math.random() * 16 | 0;
+                        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                    }),
+                    username: 'carina.massena',
+                    passwordHash: '#lider12@12',
+                    nome: 'Carina Massena',
+                    email: 'carina.massena@gmail.com',
+                    whatsapp: '71900000000',
+                    role: 'Master',
+                    permissions: {
+                        dashboard: 'edit', disciples: 'edit', leaders: 'edit',
+                        finance: 'edit', events: 'edit', harvest: 'edit', master: true
+                    }
+                };
+                try {
+                    await supabase.from('usuarios').upsert({ id: bootstrapMaster.id, record: bootstrapMaster });
+                } catch (seedErr) {
+                    console.error('Bootstrap seed failed (non-fatal):', seedErr);
+                }
+                found = bootstrapMaster;
+            }
+        }
+
+        // SYNC REAL UUID FROM SUPABASE AUTH FOR MASTER USER
+        if (found && (found.role === 'Master' || found.email === 'carina.massena@gmail.com')) {
+            let newRealId = null;
+            try {
+                // Find true UUID by email in auth.users
+                const { data: authData } = await supabase.auth.admin.listUsers();
+                if (authData && authData.users) {
+                    const authMatch = authData.users.find((u: any) => u.email === 'carina.massena@gmail.com');
+                    if (authMatch) newRealId = authMatch.id;
+                }
+            } catch (err) {
+                console.error("Failed to sync Master UUID:", err);
+            }
+
+            // If no auth match exists yet, but we are still using placeholders, FORCE a valid UUID format
+            if (!newRealId && (found.id === '1' || found.id === 'master_user')) {
+                newRealId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+
+            if (newRealId && newRealId !== found.id) {
+                const oldId = found.id;
+                found.id = newRealId;
+
+                // Ensure record also has the correct ID internally
+                found.id = newRealId;
+
+                // Update the record in usuarios to hold the real UUID
+                await supabase.from('usuarios').upsert({ id: found.id, record: found });
+
+                // Delete the old placeholder record
+                if (oldId === '1' || oldId === 'master_user') {
+                    await supabase.from('usuarios').delete().eq('id', oldId);
+                }
+            }
+        }
+
+        if (found) {
+            if (found.status === 'pending') {
+                return res.status(401).json({ error: 'Sua solicitação está em análise pela Usuária Master. Aguarde a liberação!' });
+            }
+
+            // Gera de forma segura o token JWT assinado usando a versão Edge-compatible
+            const token = await signJwtEdge(
+                { id: found.id, role: found.role, username: found.username },
+                jwtSecret
+            );
+
+            return res.status(200).json({
+                user: { ...found, sessionToken: token }
+            });
+        } else {
+            return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+        }
+    } catch (err: any) {
+        // Envia o stack trace exato para ajudar no diagnóstico do erro 500
+        return res.status(500).json({
+            error: err.message || 'Erro inesperado no servidor',
+            stack: err.stack
+        });
     }
-  };
-
-  const handleForgotPass = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      // Load users from Supabase
-      const users: UserAccount[] = await loadData<UserAccount>('users');
-      const found = users.find(u => u.email === recoveryEmail || u.username === recoveryEmail);
-
-      if (found) {
-        const code = Math.floor(1000 + Math.random() * 9000).toString();
-        setSentCode(code);
-        setTargetUser(found);
-        setRecoveryStep('code');
-        console.log(`[SIMULAÇÃO RECUPERAÇÃO] Código para ${found.email}: ${code}`);
-      } else {
-        alert("Nenhum usuário encontrado com este e-mail/username.");
-      }
-    } catch (err) {
-      console.error('Erro ao buscar usuários:', err);
-      alert("Erro ao buscar dados. Tente novamente.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyCode = () => {
-    if (recoveryCode === sentCode) {
-      setRecoveryStep('reset');
-    } else {
-      alert("Código inválido.");
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (!newPassword) return alert("Digite a nova senha.");
-    if (!targetUser) return;
-
-    const updatedUser = { ...targetUser, passwordHash: newPassword };
-    await saveRecord('users', updatedUser);
-
-    logAction(targetUser.nome || 'Sistema', "Recuperação de Senha", `Senha resetada via fluxo de esquecimento para ${targetUser.username}`, "USUARIO");
-    setRecoveryStep('success');
-  };
-
-  const handleRequestAccess = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const users: UserAccount[] = await loadData<UserAccount>('users');
-      if (users.some(u => u.username === requestData.username)) {
-        alert("Este usuário já está em uso.");
-        setIsLoading(false);
-        return;
-      }
-
-      const newUser: UserAccount = {
-        id: Math.random().toString(36).substr(2, 9),
-        ...requestData,
-        role: 'Líder',
-        permissions: {
-          dashboard: 'view', disciples: 'view', leaders: 'none',
-          finance: 'none', events: 'view', harvest: 'view', master: false
-        },
-        status: 'pending',
-        requestedAt: new Date().toISOString()
-      };
-
-      await saveRecord('users', newUser);
-      alert("Solicitação enviada com sucesso! Aguarde a liberação da liderança.");
-      setIsRequestingAccess(false);
-      setRequestData({ nome: '', email: '', whatsapp: '', username: '', passwordHash: '' });
-    } catch (err) {
-      console.error('Erro ao solicitar acesso:', err);
-      alert("Erro ao enviar solicitação.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-white md:bg-gray-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-[400px] flex flex-col items-center">
-        {!isRequestingAccess ? (
-          <form onSubmit={handleLogin} className="w-full bg-white md:shadow-2xl md:border border-gray-100 rounded-[3rem] p-10 space-y-8 animate-in zoom-in-95 fade-in duration-500">
-            <div className="text-center space-y-4">
-              <div className="w-20 h-20 bg-lime-peregrinas rounded-[2rem] flex items-center justify-center mx-auto shadow-xl border-4 border-white">
-                <Flower2 size={40} className="text-black" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-black uppercase tracking-tighter">Peregrinas</h1>
-                <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mt-1">Acesso à Geração de Luz</p>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                  <input
-                    type="text" placeholder="Usuário ou E-mail" required
-                    className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200 focus:bg-white transition-all"
-                    value={username} onChange={e => setUsername(e.target.value)}
-                  />
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                  <input
-                    type="password" placeholder="Senha" required
-                    className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200 focus:bg-white transition-all"
-                    value={password} onChange={e => setPassword(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <div className="flex items-center gap-2 text-red-500 bg-red-50 p-4 rounded-xl text-xs font-black uppercase animate-in">
-                  <AlertCircle size={14} /> {error}
-                </div>
-              )}
-
-              <button type="submit" className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl flex items-center justify-center gap-2 hover:scale-[1.02] transition-all">
-                Entrar no Sistema <ArrowRight size={16} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setRecoveryStep('email')}
-                className="w-full text-[10px] font-black uppercase text-gray-400 tracking-widest hover:text-black transition-colors"
-              >
-                Esqueci minha senha
-              </button>
-
-              <div className="pt-4 border-t border-gray-100 text-center">
-                <button
-                  type="button"
-                  onClick={() => setIsRequestingAccess(true)}
-                  className="text-[10px] font-black uppercase text-lime-600 tracking-widest hover:text-black transition-colors"
-                >
-                  Solicitar Acesso à Rede
-                </button>
-              </div>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={handleRequestAccess} className="w-full bg-white md:shadow-2xl md:border border-gray-100 rounded-[3rem] p-10 space-y-6 animate-in zoom-in-95 fade-in duration-500">
-            <div className="text-center space-y-2 mb-8">
-              <div className="w-16 h-16 bg-lime-peregrinas/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <User size={32} className="text-lime-600" />
-              </div>
-              <h1 className="text-2xl font-black uppercase tracking-tighter text-gray-900">Novo Acesso</h1>
-              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Preencha para solicitar liberação</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input type="text" placeholder="Nome Completo" required className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200 text-sm" value={requestData.nome} onChange={e => setRequestData({ ...requestData, nome: e.target.value })} />
-              </div>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input type="email" placeholder="E-mail" required className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200 text-sm" value={requestData.email} onChange={e => setRequestData({ ...requestData, email: e.target.value })} />
-              </div>
-              <div className="relative">
-                <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input type="tel" placeholder="WhatsApp" required className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200 text-sm" value={requestData.whatsapp} onChange={e => setRequestData({ ...requestData, whatsapp: e.target.value })} />
-              </div>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input type="text" placeholder="Nome de Usuário (ex: maria.silva)" required className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200 text-sm" value={requestData.username} onChange={e => setRequestData({ ...requestData, username: e.target.value })} />
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                <input type="password" placeholder="Defina sua Senha" required className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200 text-sm" value={requestData.passwordHash} onChange={e => setRequestData({ ...requestData, passwordHash: e.target.value })} />
-              </div>
-            </div>
-
-            <button disabled={isLoading} type="submit" className="w-full bg-lime-peregrinas text-black py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl flex items-center justify-center gap-2 hover:scale-[1.02] transition-all">
-              {isLoading ? <Loader2 size={16} className="animate-spin" /> : "ENVIAR SOLICITAÇÃO"}
-            </button>
-
-            <button type="button" onClick={() => setIsRequestingAccess(false)} className="w-full text-[10px] font-black uppercase text-gray-400 tracking-widest hover:text-black transition-colors">
-              Voltar ao Login
-            </button>
-          </form>
-        )}
-
-        {recoveryStep !== 'none' && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
-            <div className="bg-white w-full max-w-md rounded-[3rem] p-10 md:p-14 shadow-2xl space-y-8 animate-in zoom-in-95">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-black uppercase tracking-tight">Recuperar Conta</h2>
-                <button onClick={() => setRecoveryStep('none')}><X size={24} /></button>
-              </div>
-
-              {recoveryStep === 'email' && (
-                <form onSubmit={handleForgotPass} className="space-y-6">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                    Informe seu e-mail ou nome de usuário para enviarmos um código de verificação.
-                  </p>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                    <input
-                      type="text" placeholder="E-mail ou Usuário" required
-                      className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200"
-                      value={recoveryEmail} onChange={e => setRecoveryEmail(e.target.value)}
-                    />
-                  </div>
-                  <button disabled={isLoading} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2">
-                    {isLoading ? <Loader2 size={18} className="animate-spin" /> : "ENVIAR CÓDIGO"}
-                  </button>
-                </form>
-              )}
-
-              {recoveryStep === 'code' && (
-                <div className="space-y-6 text-center">
-                  <div className="w-16 h-16 bg-lime-50 rounded-2xl flex items-center justify-center mx-auto text-lime-600">
-                    <Smartphone size={32} />
-                  </div>
-                  <div>
-                    <h4 className="font-black uppercase text-sm">Validar Código</h4>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2">
-                      Enviamos um código de 4 dígitos para seu e-mail.
-                    </p>
-                  </div>
-                  <input
-                    type="text" maxLength={4}
-                    placeholder="0000"
-                    className="w-full p-5 bg-gray-50 rounded-2xl text-center text-3xl font-black tracking-[0.5em] outline-none"
-                    value={recoveryCode} onChange={e => setRecoveryCode(e.target.value)}
-                  />
-                  <button onClick={handleVerifyCode} className="w-full bg-lime-peregrinas text-black py-5 rounded-2xl font-black uppercase tracking-widest text-xs">
-                    VERIFICAR AGORA
-                  </button>
-                </div>
-              )}
-
-              {recoveryStep === 'reset' && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                      Olá <span className="text-black">{targetUser?.nome}</span>, defina sua nova senha de acesso abaixo.
-                    </p>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                      <input
-                        type="password" placeholder="Nova Senha" required
-                        className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200"
-                        value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <button onClick={handleResetPassword} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs">
-                    REDEFINIR SENHA
-                  </button>
-                </div>
-              )}
-
-              {recoveryStep === 'success' && (
-                <div className="text-center space-y-6 py-6 animate-in zoom-in-95">
-                  <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto">
-                    <CheckCircle size={48} />
-                  </div>
-                  <h4 className="font-black text-xl uppercase tracking-tight">Tudo pronto!</h4>
-                  <p className="text-xs text-gray-400">Sua senha foi redefinida. Você já pode acessar o sistema com sua nova chave.</p>
-                  <button onClick={() => setRecoveryStep('none')} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs">
-                    VOLTAR AO LOGIN
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="text-center pt-8">
-          <p className="text-[9px] text-gray-300 font-black uppercase tracking-widest">© 2025 Peregrinas App • V3.0</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Login;
+}
