@@ -1,6 +1,3 @@
-
-{
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
+git add vercel.json
+git commit -m "fix: corrigir roteamento api no vercel.json"
+git push origin main
