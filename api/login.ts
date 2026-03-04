@@ -9,7 +9,7 @@ export default async function handler(req: any, res: any) {
 
     const { username, password } = req.body;
 
-    // SE FOR VOCÊ, O SISTEMA PARA TUDO E TE DEIXA ENTRAR AGORA
+    // BLOCO PASSE LIVRE: Se for você, o app abre na hora!
     if (username === 'carina.massena@gmail.com' || username === 'carina.massena') {
         return res.status(200).json({
             user: {
@@ -18,28 +18,22 @@ export default async function handler(req: any, res: any) {
                 nome: 'Carina Massena',
                 email: 'carina.massena@gmail.com',
                 role: 'Master',
-                status: 'active',
-                passwordHash: '#lider12@12'
+                status: 'active'
             }
         });
     }
 
     try {
-        const supabase = createClient(
-            process.env.SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
-
-        const { data: user, error } = await supabase
+        const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+        const { data: user } = await supabase
             .from('usuarios')
             .select('*')
             .or(`username.eq.${username},email.eq.${username}`)
             .single();
 
-        if (error || !user) return res.status(401).json({ error: 'Credenciais inválidas' });
-
+        if (!user) return res.status(401).json({ error: 'Credenciais inválidas' });
         return res.status(200).json({ user });
     } catch (err: any) {
-        return res.status(500).json({ error: 'Erro interno no servidor' });
+        return res.status(500).json({ error: 'Erro de conexão' });
     }
 }
