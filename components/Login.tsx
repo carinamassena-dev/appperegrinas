@@ -1,4 +1,3 @@
-
 import React, { useState, useContext } from 'react';
 import { Flower2, Lock, User, ArrowRight, AlertCircle, X, CheckCircle, Smartphone, Mail, Loader2 } from 'lucide-react';
 import { AuthContext, AuthContextType } from '../App';
@@ -59,7 +58,11 @@ const Login: React.FC = () => {
 
       const data = await res.json();
 
-      if (data.user && data.user.sessionToken) {
+      if (data && data.user) {
+        // Se houver token na resposta, garante que o usuário tenha ele
+        if (data.sessionToken && !data.user.sessionToken) {
+          data.user.sessionToken = data.sessionToken;
+        }
         login(data.user);
       } else {
         setError('Resposta inválida do servidor de autenticação.');
