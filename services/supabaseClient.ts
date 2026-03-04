@@ -6,9 +6,9 @@ import { createClient } from '@supabase/supabase-js';
  */
 const getSupabaseConfig = () => {
     // @ts-ignore
-    const url = import.meta.env.VITE_SUPABASE_URL || 'https://ofrwgukuoqbftdyzbfza.supabase.co';
+    const url = import.meta.env.VITE_SUPABASE_URL;
     // @ts-ignore
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mcndndWt1b3FiZnRkeXpiZnphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MDM2NjksImV4cCI6MjA4ODE3OTY2OX0.igAsGDZA1QbZfPQW7i4V9jNBvu02Mds3Cs7-pLQ26MI';
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
     return { url, key };
 };
 
@@ -62,3 +62,4 @@ export const safeQuery = async <T = unknown>(
     const { data, error } = await query;
     return { data: data as T[] | null, error };
 };
+
