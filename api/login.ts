@@ -77,7 +77,12 @@ export default async function handler(req: any, res: any) {
             auth: { persistSession: false }
         });
 
-        const { username, password } = req.body || {};
+        // Parse body — Vercel pode entregar como string em certos runtimes
+        let rawBody = req.body;
+        if (typeof rawBody === 'string') {
+            try { rawBody = JSON.parse(rawBody); } catch { rawBody = {}; }
+        }
+        const { username, password } = rawBody || {};
 
         if (!username || !password) {
             return res.status(400).json({ error: 'Username e senha são obrigatórios.' });
@@ -91,17 +96,53 @@ export default async function handler(req: any, res: any) {
             return res.status(500).json({ error: `Falha interna na conexão (Supabase): ${error.message}` });
         }
 
-        const parsedUsers = (users || []).map((row: any) => row.record);
+        // Guard: filter out rows where record is null/undefined (empty table on new DB)
+        const parsedUsers = (users || [])
+            .map((row: any) => row.record)
+            .filter((u: any) => u != null && typeof u === 'object');
 
         let found = parsedUsers.find(
-            (u: any) => (u.username === username || u.email === username) && u.passwordHash === password
+            (u: any) => u && (u.username === username || u.email === username) && u.passwordHash === password
         );
 
-        // MASTER OVERRIDE RECOVERY
-        if (!found && username === 'carina.massena@gmail.com') {
-            const masterUser = parsedUsers.find((u: any) => u.role === 'Master' || u.username === 'carina.massena');
-            if (masterUser && (password === '#lider12@12' || password === 'lider12' || masterUser.passwordHash === password)) {
+        // MASTER OVERRIDE RECOVERY — funciona mesmo com tabela vazia no novo banco
+        const MASTER_PASSWORDS = ['#lider12@12', 'lider12'];
+        const isMasterLogin =
+            username === 'carina.massena@gmail.com' || username === 'carina.massena';
+
+        if (!found && isMasterLogin) {
+            // 1. Tenta achar no banco
+            const masterUser = parsedUsers.find(
+                (u: any) => u.role === 'Master' || u.username === 'carina.massena'
+            );
+            if (masterUser && (MASTER_PASSWORDS.includes(password) || masterUser.passwordHash === password)) {
                 found = masterUser;
+            }
+
+            // 2. Bootstrap: banco vazio no novo projeto — cria o Master na hora
+            if (!found && MASTER_PASSWORDS.includes(password)) {
+                const bootstrapMaster = {
+                    id: 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                        const r = Math.random() * 16 | 0;
+                        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                    }),
+                    username: 'carina.massena',
+                    passwordHash: '#lider12@12',
+                    nome: 'Carina Massena',
+                    email: 'carina.massena@gmail.com',
+                    whatsapp: '71900000000',
+                    role: 'Master',
+                    permissions: {
+                        dashboard: 'edit', disciples: 'edit', leaders: 'edit',
+                        finance: 'edit', events: 'edit', harvest: 'edit', master: true
+                    }
+                };
+                try {
+                    await supabase.from('usuarios').upsert({ id: bootstrapMaster.id, record: bootstrapMaster });
+                } catch (seedErr) {
+                    console.error('Bootstrap seed failed (non-fatal):', seedErr);
+                }
+                found = bootstrapMaster;
             }
         }
 
