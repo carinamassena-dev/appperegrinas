@@ -26,6 +26,56 @@ const Login: React.FC = () => {
     nome: '', email: '', whatsapp: '', username: '', passwordHash: ''
   });
 
+  // ==========================================================
+  // FUNÇÃO MÁGICA: RESGATAR DADOS DO CHROME PARA A NUVEM
+  // ==========================================================
+  const migrarParaNuvemMagicamente = async () => {
+    // Tenta pegar a url direto da memória do Vite
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ofrwgukuoqbftdyzbfza.supabase.co'; 
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mcndndWt1b3FiZnRkeXpiZnphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MDM2NjksImV4cCI6MjA4ODE3OTY2OX0.igAsGDZA1QbZfPQW7i4V9jNBvu02Mds3Cs7-pLQ26MI';
+
+    const tabelas = ['peregrinas', 'financeiro', 'atas', 'eventos', 'colheita', 'feed', 'tickets', 'usuarios', 'lideres'];
+    let migrados = 0;
+    
+    for (const tabela of tabelas) {
+      const dados = localStorage.getItem(tabela);
+      if (dados) {
+        try {
+          const parsed = JSON.parse(dados);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            
+            // Corrige o formato se não tiver field id
+            const payload = parsed.map((item: any) => ({
+              id: item.id || crypto.randomUUID(),
+              record: item
+            }));
+
+            await fetch(`${supabaseUrl}/rest/v1/${tabela}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Prefer': 'resolution=merge-duplicates'
+              },
+              body: JSON.stringify(payload)
+            });
+            migrados += parsed.length;
+          }
+        } catch (e) { console.error(`Erro na tabela ${tabela}`, e); }
+      }
+    }
+    
+    if (migrados > 0) {
+       alert(`SUCESSO SUPREMO! ${migrados} cadastros foram resgatados do seu computador preenchendo as tabelas da nuvem Supabase.\nAtualize a página e pronto!`);
+       // Limpa temporariamente pra testar a migração
+       localStorage.clear();
+    } else {
+       alert("O botão varreu as pastas do seu Chrome, mas não achou nenhuma discípula guardada off-line aqui. Fique atenta ao navegador correto!");
+    }
+  };
+
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -42,7 +92,7 @@ const Login: React.FC = () => {
         const textError = await res.text(); // Lê como texto bruto primeiro
         console.error("ERRO BRUTO DA API:", textError);
 
-        // Tenta extrair mensagem amigável se de fato for um JSON formatado por nós (Ex: 401 Senha incorreta)
+        // Tenta extrair mensagem amigável 
         try {
           const parsed = JSON.parse(textError);
           if (parsed.error) {
@@ -59,7 +109,6 @@ const Login: React.FC = () => {
       const data = await res.json();
 
       if (data && data.user) {
-        // Se houver token na resposta, garante que o usuário tenha ele
         if (data.sessionToken && !data.user.sessionToken) {
           data.user.sessionToken = data.sessionToken;
         }
@@ -81,7 +130,6 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Load users from Supabase
       const users: UserAccount[] = await loadData<UserAccount>('users');
       const found = users.find(u => u.email === recoveryEmail || u.username === recoveryEmail);
 
@@ -202,10 +250,19 @@ const Login: React.FC = () => {
                 Entrar no Sistema <ArrowRight size={16} />
               </button>
 
+              {/* NOSSO BOTÃO DE EMERGÊNCIA APARECE AQUI */}
+              <button 
+                  type="button" 
+                  onClick={migrarParaNuvemMagicamente} 
+                  className="w-full bg-lime-600 text-white shadow-lg py-4 rounded-xl font-bold uppercase text-[9px] mt-2 border-2 border-lime-700 hover:bg-lime-700 transition-all"
+              >
+                  Recuperar Dados do Computador ➜ Nuvem
+              </button>
+
               <button
                 type="button"
                 onClick={() => setRecoveryStep('email')}
-                className="w-full text-[10px] font-black uppercase text-gray-400 tracking-widest hover:text-black transition-colors"
+                className="w-full text-[10px] font-black uppercase text-gray-400 tracking-widest hover:text-black transition-colors pt-2"
               >
                 Esqueci minha senha
               </button>
@@ -318,45 +375,4 @@ const Login: React.FC = () => {
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                      Olá <span className="text-black">{targetUser?.nome}</span>, defina sua nova senha de acesso abaixo.
-                    </p>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                      <input
-                        type="password" placeholder="Nova Senha" required
-                        className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200"
-                        value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <button onClick={handleResetPassword} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs">
-                    REDEFINIR SENHA
-                  </button>
-                </div>
-              )}
-
-              {recoveryStep === 'success' && (
-                <div className="text-center space-y-6 py-6 animate-in zoom-in-95">
-                  <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto">
-                    <CheckCircle size={48} />
-                  </div>
-                  <h4 className="font-black text-xl uppercase tracking-tight">Tudo pronto!</h4>
-                  <p className="text-xs text-gray-400">Sua senha foi redefinida. Você já pode acessar o sistema com sua nova chave.</p>
-                  <button onClick={() => setRecoveryStep('none')} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs">
-                    VOLTAR AO LOGIN
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="text-center pt-8">
-          <p className="text-[9px] text-gray-300 font-black uppercase tracking-widest">© 2025 Peregrinas App • V3.0</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Login;
+                      Olá <span className="text-black">{targetUser?.
