@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import {
   Users, Sprout, DollarSign, Calendar,
   Menu, X, Flower2, ShieldCheck,
-  Home as HomeIcon, Activity, UserPlus, LogOut, MapPin, Gift, HelpCircle,
-  BarChart3, QrCode, BookOpen, GraduationCap, ClipboardList, UserCircle, MoreHorizontal, Plus, MessageSquarePlus, Mail, Calculator
+  Home as HomeIcon, Activity, LogOut, MapPin, Gift, HelpCircle,
+  BarChart3, QrCode, BookOpen, GraduationCap, ClipboardList, UserCircle, MoreHorizontal, MessageSquarePlus, Mail, Calculator, MessageSquare
 } from 'lucide-react';
 
 
@@ -40,6 +39,8 @@ import MasterEditModal from './components/MasterEditModal';
 import { applyThemeToDOM, loadConfigFromSupabase } from './services/uiConfigService';
 import { loadData, saveRecord } from './services/dataService';
 import { supabase } from './services/supabaseClient';
+import MuralComunhao from './components/MuralComunhao';
+import AgendaGeracao from './components/AgendaGeracao';
 
 export interface AuthContextType {
   user: UserAccount | null;
@@ -252,7 +253,6 @@ const CompleteProfile = () => {
 const App: React.FC = () => {
   const [user, setUser] = useState<UserAccount | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isFabOpen, setIsFabOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isMasterModalOpen, setIsMasterModalOpen] = useState(false);
 
@@ -278,6 +278,7 @@ const App: React.FC = () => {
 
         // Load users from Supabase
         let users: UserAccount[] = await loadData<UserAccount>('users');
+        users = (users || []).filter(Boolean); // Drop null records from DB response
 
         // Ensure all users have valid permissions
         let needsPermFix = false;
@@ -291,10 +292,10 @@ const App: React.FC = () => {
 
         // Force Carina Master to have the correct email
         users = users.map((u: UserAccount) => {
-          if (u.role === 'Master' && u.username === 'carina.massena') {
+          if (u?.role === 'Master' && u?.username === 'carina.massena') {
             return { ...u, email: 'carina.massena@gmail.com' };
           }
-          if (u.role === 'Master' && (!u.passwordHash || u.passwordHash.trim() === '')) {
+          if (u?.role === 'Master' && (!u?.passwordHash || u?.passwordHash.trim() === '')) {
             needsUpdate = true;
             return { ...u, passwordHash: '#lider12@12', email: 'carina.massena@gmail.com' };
           }
@@ -303,12 +304,12 @@ const App: React.FC = () => {
 
         if (needsUpdate || needsPermFix) {
           for (const u of users) {
-            await saveRecord('users', u);
+             if (u) await saveRecord('users', u);
           }
         }
 
         // Create default Master user if none exists
-        if (!users.some((u: UserAccount) => u.role === 'Master')) {
+        if (!users.some((u: UserAccount) => u?.role === 'Master')) {
           const master: UserAccount = {
             id: Math.random().toString(36).substr(2, 9),
             username: 'carina.massena',
@@ -460,10 +461,12 @@ const App: React.FC = () => {
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Ouvidoria</div>
                           <NavItem to="/tickets" icon={MessageSquarePlus} label="Chamados & Tickets" permission="dashboard" />
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Conteúdo</div>
+                          <NavItem to="/mural" icon={MessageSquare} label="Mural de Comunhão" permission="dashboard" />
+                          <NavItem to="/agenda" icon={Calendar} label="Agenda da Geração" permission="dashboard" />
                           <NavItem to="/feed" icon={BookOpen} label="Feed Palavras" permission="dashboard" />
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Configurações</div>
                           <NavItem to="/perfil" icon={UserCircle} label="Meu Perfil" permission="profile" />
-                          <NavItem to="/ajuda" icon={HelpCircle} label="Central de Ajuda" permission="dashboard" />
+                          <NavItem to="/ajuda" icon={HelpCenter} label="Central de Ajuda" permission="dashboard" />
                           {user.permissions?.master && <NavItem to="/admin" icon={ShieldCheck} label="Master Admin" permission="master" />}
                         </nav>
 
@@ -494,6 +497,8 @@ const App: React.FC = () => {
                           <Route path="/checkin" element={<CheckIn />} />
                           <Route path="/tickets" element={<Tickets />} />
                           <Route path="/feed" element={<Feed />} />
+                          <Route path="/mural" element={<MuralComunhao userProfile={user} />} />
+                          <Route path="/agenda" element={<AgendaGeracao eventos={[]} onAddEvento={() => { }} userRole={user.role} />} />
                           <Route path="/cursos" element={<CoursesControl />} />
                           <Route path="/atas" element={<CellMeetings />} />
                           <Route path="/perfil" element={<ProfileSettings />} />
@@ -505,18 +510,6 @@ const App: React.FC = () => {
                     </main>
 
                     <div className="hidden md:flex fixed top-12 right-6 z-[150] items-center gap-4">
-                      {/* Master Edit Button — only visible for master users */}
-                      {user.permissions?.master && (
-                        <button
-                          onClick={() => setIsMasterModalOpen(true)}
-                          title="Editor Master"
-                          className="flex items-center gap-2 bg-gray-900 text-white px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-black hover:scale-105 transition-all border border-white/10 h-12"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
-                          Editar UI
-                        </button>
-                      )}
-
                       <DraftIndicator />
                       <NotificationBell />
                     </div>
@@ -526,20 +519,7 @@ const App: React.FC = () => {
                       <MasterEditModal onClose={() => setIsMasterModalOpen(false)} />
                     )}
 
-                    <div className="lg:hidden fixed bottom-24 right-6 z-40">
-                      {isFabOpen && (
-                        <div className="flex flex-col gap-3 mb-4 animate-in slide-in-from-bottom-5">
-                          <QuickFabLink to="/atas" icon={ClipboardList} label="Ata" onClick={() => setIsFabOpen(false)} />
-                          <QuickFabLink to="/financeiro" icon={Plus} label="Lançar" onClick={() => setIsFabOpen(false)} />
-                        </div>
-                      )}
-                      <button
-                        onClick={() => setIsFabOpen(!isFabOpen)}
-                        className={`w-16 h-16 rounded-full flex items-center justify-center shadow-2xl transition-all ${isFabOpen ? 'bg-black text-white rotate-45' : 'bg-lime-peregrinas text-black'}`}
-                      >
-                        <Plus size={32} />
-                      </button>
-                    </div>
+                    {/* FAB removido — obstruía a visão no celular */}
 
                     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t flex items-center justify-around px-2 z-50 h-20 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
                       <BottomNavItem to="/" icon={HomeIcon} label="Início" />
