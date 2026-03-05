@@ -458,6 +458,54 @@ export const supabaseService = {
         const { data, error } = await query.select().single();
         if (error) throw error;
         return data;
+    },
+
+    // --- AMIGO SECRETO ---
+    async saveAmigoSecretoBatch(records: any[]) {
+        if (!supabase) throw new Error("Supabase não configurado.");
+        const orgId = getMyOrgId();
+
+        // Garante que a organization_id está injetada em todos
+        const payload = records.map(r => ({
+            ...r,
+            ...(orgId ? { organization_id: orgId } : {})
+        }));
+
+        const { error } = await supabase.from('amigo_secreto').insert(payload);
+        if (error) {
+            console.error('[Supabase Error] saveAmigoSecretoBatch:', error);
+            throw error;
+        }
+    },
+
+    async getHistoricoSorteios() {
+        if (!supabase) return [];
+        const orgId = getMyOrgId();
+        let query = supabase.from('amigo_secreto').select('*').order('created_at', { ascending: false });
+        if (orgId) query = query.eq('organization_id', orgId);
+
+        const { data, error } = await query;
+        if (error) {
+            console.error('[Supabase Error] getHistoricoSorteios:', error);
+            return [];
+        }
+        return data || [];
+    },
+
+    async revelarAmigoSecretoByToken(token: string) {
+        if (!supabase) return null;
+        // Não filtramos por orgId aqui pois a pessoa abre pelo link no celular (pode não estar logada e sem contexto de org)
+        const { data, error } = await supabase
+            .from('amigo_secreto')
+            .select('nome_participante, nome_sorteado, grupo_id, created_at')
+            .eq('token', token)
+            .single();
+
+        if (error) {
+            console.warn('[Supabase Warn] revelarAmigoSecretoByToken:', error);
+            return null; // Token inválido ou não achou
+        }
+        return data;
     }
 }
 

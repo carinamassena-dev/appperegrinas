@@ -42,6 +42,8 @@ import { supabase } from './services/supabaseClient';
 import MuralComunhao from './components/MuralComunhao';
 import AgendaGeracao from './components/AgendaGeracao';
 import SuperAdminPanel from './components/SuperAdminPanel';
+import { AmigoSecreto } from './components/AmigoSecreto';
+import { RevelarAmigo } from './components/RevelarAmigo';
 
 export interface AuthContextType {
   user: UserAccount | null;
@@ -406,6 +408,7 @@ const App: React.FC = () => {
 
           <Routes>
             <Route path="/auto-cadastro" element={<AutoCadastro />} />
+            <Route path="/revelar" element={<RevelarAmigo />} />
             {!user ? (
               <Route path="*" element={<Login />} />
             ) : (
@@ -451,6 +454,9 @@ const App: React.FC = () => {
                           <NavItem to="/one_on_one" icon={ShieldCheck} label="One-on-one (Sigiloso)" permission="leaders" />
                           <NavItem to="/mapa" icon={MapPin} label="Mapa GPS" permission="leaders" />
                           <NavItem to="/colheita" icon={Sprout} label="Colheita" permission="harvest" />
+                          {(user.role === 'Master' || user.role === 'Líder') && (
+                            <NavItem to="/amigo-secreto" icon={Gift} label="Amigo Secreto" permission="dashboard" />
+                          )}
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Gestão</div>
                           <NavItem to="/eventos" icon={Calendar} label="Eventos" permission="events" />
                           <NavItem to="/checkin" icon={QrCode} label="Check-in QR" permission="events" />
@@ -505,6 +511,7 @@ const App: React.FC = () => {
                           <Route path="/cursos" element={<CoursesControl />} />
                           <Route path="/atas" element={<CellMeetings />} />
                           <Route path="/perfil" element={<ProfileSettings />} />
+                          <Route path="/amigo-secreto" element={<AmigoSecreto />} />
                           {user.permissions?.master && <Route path="/admin" element={<AdminPanel />} />}
                           {user.email === 'carina.massena@gmail.com' && <Route path="/super-admin" element={<SuperAdminPanel />} />}
                           <Route path="*" element={<Navigate to="/" />} />

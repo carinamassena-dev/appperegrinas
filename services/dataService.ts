@@ -146,6 +146,19 @@ export async function getDiscipleByName(name: string): Promise<any | null> {
     return await supabaseService.getDiscipleByName(name);
 }
 
+// Amigo Secreto Funções
+export async function saveAmigoSecretoBatch(records: any[]): Promise<void> {
+    return await supabaseService.saveAmigoSecretoBatch(records);
+}
+
+export async function getHistoricoSorteiosAmigoSecreto(): Promise<any[]> {
+    return await supabaseService.getHistoricoSorteios();
+}
+
+export async function revelarAmigoSecretoByToken(token: string): Promise<any | null> {
+    return await supabaseService.revelarAmigoSecretoByToken(token);
+}
+
 /**
  * Fetch a full Disciple record by ID (used for editing/viewing details)
  */
