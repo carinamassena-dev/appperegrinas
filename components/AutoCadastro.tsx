@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 // Comentário: Importação de useSearchParams e useNavigate corrigida para garantir compatibilidade com o ambiente.
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Flower2, User, Phone, Home, Heart, ShieldAlert, CheckCircle, MessageCircle, Mail, Lock } from 'lucide-react';
-import { Disciple, BaptismStatus, Leader } from '../types';
+import { Disciple, BaptismStatus, Leader, CDLevel } from '../types';
 import { loadData, saveRecord } from '../services/dataService';
 
 const AutoCadastro: React.FC = () => {
@@ -21,7 +21,8 @@ const AutoCadastro: React.FC = () => {
     nome: '', email: '', whatsapp: '', dataAniversario: '', statusRelacionamento: 'Solteira',
     profissao: '', coresPreferidas: '', presentesPreferidos: '',
     contatoEmergenciaNome: '', contatoEmergenciaFone: '',
-    endereco: '', bairro: '', liderDireta: '', status: 'Ativa', passwordHash: ''
+    endereco: '', bairro: '', cidade: 'Salvador', liderDireta: '', status: 'Ativa', passwordHash: '',
+    batizada: BaptismStatus.NAO_BATIZADA, dataBatismo: '', fezUV: false, fezEncontro: false, cdStatus: CDLevel.NAO_INICIOU
   });
 
   const [isLoadingDisciple, setIsLoadingDisciple] = useState(false);
@@ -93,7 +94,13 @@ const AutoCadastro: React.FC = () => {
               contatoEmergenciaNome: rec.contatoEmergenciaNome || '',
               contatoEmergenciaFone: rec.contatoEmergenciaFone || '',
               endereco: rec.endereco || '',
-              bairro: rec.bairro || ''
+              bairro: rec.bairro || '',
+              cidade: rec.cidade || 'Salvador',
+              batizada: rec.batizada || BaptismStatus.NAO_BATIZADA,
+              dataBatismo: rec.dataBatismo || '',
+              fezUV: rec.fezUV || false,
+              fezEncontro: rec.fezEncontro || false,
+              cdStatus: rec.cdStatus || CDLevel.NAO_INICIOU
             }));
           }
         } catch (err) {
@@ -277,8 +284,52 @@ const AutoCadastro: React.FC = () => {
                 <Home size={20} /> Onde você mora?
               </h3>
               <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input label="Cidade" value={formData.cidade} onChange={v => setFormData({ ...formData, cidade: v })} />
+                  <Input label="Bairro" value={formData.bairro} onChange={v => setFormData({ ...formData, bairro: v })} />
+                </div>
                 <Input label="Endereço" value={formData.endereco} onChange={v => setFormData({ ...formData, endereco: v })} />
-                <Input label="Bairro" value={formData.bairro} onChange={v => setFormData({ ...formData, bairro: v })} />
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+              <h3 className="text-lg font-black uppercase tracking-widest text-purple-600 flex items-center gap-2">
+                <CheckCircle size={20} /> Vida Cristã (Maturidade)
+              </h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Batismo</label>
+                    <select className="w-full p-4 bg-gray-50 rounded-2xl font-bold border-none" value={formData.batizada} onChange={e => setFormData({ ...formData, batizada: e.target.value as any })}>
+                      <option value={BaptismStatus.BATIZADA}>Já sou Batizada</option>
+                      <option value={BaptismStatus.NAO_BATIZADA}>Não sou Batizada</option>
+                    </select>
+                  </div>
+                  {formData.batizada === BaptismStatus.BATIZADA && (
+                    <Input label="Data do Batismo" type="date" value={formData.dataBatismo} onChange={v => setFormData({ ...formData, dataBatismo: v })} />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-2xl">
+                    <input type="checkbox" checked={formData.fezUV} onChange={e => setFormData({ ...formData, fezUV: e.target.checked })} className="w-5 h-5 accent-lime-600" />
+                    <span className="text-xs font-black uppercase text-gray-700">Fez UV?</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-2xl">
+                    <input type="checkbox" checked={formData.fezEncontro} onChange={e => setFormData({ ...formData, fezEncontro: e.target.checked })} className="w-5 h-5 accent-lime-600" />
+                    <span className="text-xs font-black uppercase text-gray-700">Fez Encontro?</span>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400">Capacitação Destino</label>
+                    <select className="w-full p-4 bg-gray-50 rounded-2xl font-bold border-none text-[10px]" value={formData.cdStatus} onChange={e => setFormData({ ...formData, cdStatus: e.target.value as CDLevel })}>
+                      <option>Não Iniciou</option>
+                      <option>Nível 1</option>
+                      <option>Nível 2</option>
+                      <option>Nível 3</option>
+                      <option>Concluído</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
 

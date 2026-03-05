@@ -99,7 +99,7 @@ const AdminPanel: React.FC = () => {
     } else {
       changedUser = {
         ...userData,
-        id: `USR_${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+        id: crypto.randomUUID(),
         passwordHash: userData.passwordHash || '123456',
         status: 'active',
         organization_id: currentUser?.organization_id
@@ -263,6 +263,80 @@ const AdminPanel: React.FC = () => {
                   </p>
                   <p className="text-[9px] text-green-600 mt-1">A URL e Key estão sendo carregadas das variáveis de ambiente automaticamente.</p>
                 </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
+              <div>
+                <h3 className="text-xl font-black uppercase flex items-center gap-3 tracking-tighter">
+                  <Sparkles className="text-purple-600" size={24} /> Limpeza de Dados
+                </h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Utilitários de Manutenção</p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    if (!confirm("Isso removerá peregrinas com o mesmo nome (mantendo apenas uma). Deseja continuar?")) return;
+                    setIsSyncing(true);
+                    try {
+                      // Fetch ALL records for deduplication processing
+                      const all = await supabaseService.getAll('peregrinas');
+                      const seen = new Set();
+                      const toDelete: string[] = [];
+                      const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+                      all.forEach((d: any) => {
+                        const n = normalize(d.nome);
+                        if (seen.has(n)) {
+                          toDelete.push(d.id);
+                        } else {
+                          seen.add(n);
+                        }
+                      });
+
+                      if (toDelete.length === 0) {
+                        alert("Nenhuma duplicata encontrada.");
+                      } else {
+                        if (confirm(`Encontradas ${toDelete.length} duplicatas. Confirmar exclusão?`)) {
+                          // Successive deletion
+                          for (const id of toDelete) {
+                            await deleteRecord('disciples', id);
+                          }
+                          alert(`${toDelete.length} duplicatas removidas com sucesso!`);
+                          window.location.reload();
+                        }
+                      }
+                    } catch (e) {
+                      console.error(e);
+                      alert("Erro ao limpar duplicatas.");
+                    } finally {
+                      setIsSyncing(false);
+                    }
+                  }}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-purple-50 rounded-2xl border border-transparent hover:border-purple-200 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Trash2 size={20} className="text-gray-400 group-hover:text-purple-600" />
+                    <span className="text-xs font-black uppercase text-gray-900">Limpar Duplicatas</span>
+                  </div>
+                  {isSyncing ? <Loader2 size={16} className="animate-spin text-purple-600" /> : <ArrowRight size={16} className="text-gray-300" />}
+                </button>
+
+                <button
+                  onClick={() => {
+                    localStorage.clear();
+                    alert("Cache local limpo! O sistema recarregará os dados do servidor.");
+                    window.location.reload();
+                  }}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-amber-50 rounded-2xl border border-transparent hover:border-amber-200 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <RefreshCw size={20} className="text-gray-400 group-hover:text-amber-600" />
+                    <span className="text-xs font-black uppercase text-gray-900">Limpar Cache Local</span>
+                  </div>
+                  <ArrowRight size={16} className="text-gray-300 group-hover:translate-x-1 transition-transform" />
+                </button>
               </div>
             </div>
 

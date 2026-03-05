@@ -64,6 +64,13 @@ const Disciples: React.FC = () => {
     return data as Disciple[];
   }, { revalidateOnFocus: true });
 
+  const { data: totalCount = 0, mutate: mutateCount } = useSWR('/api/disciples/count', async () => {
+    try {
+      const { supabaseService } = await import('../services/supabaseService');
+      return await supabaseService.getCount('peregrinas');
+    } catch (e) { return 0; }
+  }, { revalidateOnFocus: true });
+
   const { data: treeData = [], isLoading: isLoadingTree } = useSWR(viewMode === 'tree' ? '/api/linhagem' : null, async () => {
     return await loadLinhagem();
   });
@@ -256,9 +263,9 @@ const Disciples: React.FC = () => {
       const m = {
         nome: findCol(['nome completo', 'nome']),
         whatsapp: findCol(['whatsapp', 'telefone', 'celular']),
-        dataAniversario: findCol(['data de nasc.', 'nascimento', 'data aniversario', 'data de nascimento', 'nasc']),
+        dataAniversario: findCol(['data do aniversario', 'data de nasc.', 'nascimento', 'data aniversario', 'data de nascimento']),
         idade: findCol(['idade']),
-        statusRelacionamento: findCol(['status relacionamento', 'estado civil']),
+        statusRelacionamento: findCol(['status de relacionamento', 'status relacionamento', 'estado civil']),
         profissao: findCol(['profissao', 'ocupacao']),
         endereco: findCol(['endereco', 'rua']),
         bairro: findCol(['bairro']),
@@ -267,17 +274,17 @@ const Disciples: React.FC = () => {
         lider12: findCol(['lider de 12', 'lider 12']),
         batizada: findCol(['batizada?', 'batizada', 'batismo']),
         dataBatismo: findCol(['data de batismo', 'data batismo']),
-        fezUV: findCol(['fez uv?', 'fez uv', 'universidade da vida']),
+        fezUV: findCol(['fez a uv?', 'fez uv', 'fez uv?', 'universidade da vida']),
         dataInscricaoUV: findCol(['data inscricao uv', 'inicio uv']),
         dataConclusaoUV: findCol(['data conclusao uv', 'fim uv']),
         fezEncontro: findCol(['fez encontro?', 'fez encontro', 'encontro com deus']),
         dataConclusaoEncontro: findCol(['data conclusao encontro', 'data encontro']),
-        fezCD: findCol(['fez cd?', 'fez cd', 'caminho do discipulado']),
-        cdStatus: findCol(['status cd', 'nivel cd']),
-        coresPreferidas: findCol(['cores preferidas', 'cor preferida']),
-        presentesPreferidos: findCol(['presentes preferidos', 'presente preferido']),
-        livrosPreferidos: findCol(['livros preferidos', 'livro preferido']),
-        ministerio: findCol(['qual ministerio?', 'ministerio', 'serve em qual']),
+        fezCD: findCol(['fez a cd?', 'fez cd', 'fez cd?', 'caminho do discipulado']),
+        cdStatus: findCol(['nivel cd?', 'status cd', 'nivel cd']),
+        coresPreferidas: findCol(['cores preferida?', 'cores preferidas', 'cor preferida']),
+        presentesPreferidos: findCol(['quais tipo de presentes prefere?', 'presentes preferidos', 'presente preferido']),
+        livrosPreferidos: findCol(['quais tipos de livros prefere?', 'livros preferidos', 'livro preferido']),
+        ministerio: findCol(['serve em qual ministerio?', 'ministerio', 'qual ministerio?']),
         observacao: findCol(['observacoes', 'obs', 'observacao'])
       };
 
@@ -287,36 +294,50 @@ const Disciples: React.FC = () => {
       }
 
       const existingNames = new Set(disciples.map(d => normalize(d.nome)));
-      const existingWhats = new Set(disciples.map(d => (d.whatsapp || '').replace(/\D/g, '')).filter(w => w.length > 5));
 
       const imported: Disciple[] = [];
       let skipped = 0;
+
+      const convertDate = (val: string) => {
+        if (!val) return '';
+        const clean = val.trim();
+        if (clean.includes('/')) {
+          const parts = clean.split('/');
+          if (parts.length === 3) {
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+            return `${year}-${month}-${day}`;
+          }
+        }
+        return clean;
+      };
 
       rows.slice(1).forEach(row => {
         const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/"/g, ''));
         if (cols.length < 2 || !cols[m.nome] || cols[m.nome].trim() === "") return;
 
         const nomeVal = cols[m.nome];
-        const wppVal = m.whatsapp !== -1 ? cols[m.whatsapp] : '';
-        const wppClean = wppVal.replace(/\D/g, '');
 
-        const isDupe = existingNames.has(normalize(nomeVal)) || (wppClean.length > 5 && existingWhats.has(wppClean));
-
-        if (isDupe) {
+        // Softened dupe check
+        if (existingNames.has(normalize(nomeVal))) {
           skipped++;
           return;
         }
 
-        const isSim = (val: string) => val.toLowerCase() === 'sim' || val.toLowerCase() === 'true' || val.toLowerCase() === 'batizada';
+        const isSim = (val: string) => {
+          const v = val.toLowerCase();
+          return v === 'sim' || v === 'true' || v === 'batizada' || v.includes('concluido') || v.includes('cursando');
+        };
 
         const batizadaBoolean = m.batizada !== -1 ? isSim(cols[m.batizada]) : false;
 
         const d: Disciple = {
           id: `DSC_${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
           nome: nomeVal,
-          whatsapp: wppVal,
-          idade: m.idade !== -1 ? parseInt(cols[m.idade]) || 0 : 0,
-          dataAniversario: m.dataAniversario !== -1 ? cols[m.dataAniversario] : '',
+          whatsapp: m.whatsapp !== -1 ? cols[m.whatsapp] : '',
+          idade: 0, // Will be calculated below
+          dataAniversario: m.dataAniversario !== -1 ? convertDate(cols[m.dataAniversario]) : '',
           statusRelacionamento: m.statusRelacionamento !== -1 ? cols[m.statusRelacionamento] : 'Solteira',
           profissao: m.profissao !== -1 ? cols[m.profissao] : '',
           endereco: m.endereco !== -1 ? cols[m.endereco] : '',
@@ -325,12 +346,12 @@ const Disciples: React.FC = () => {
           liderDireta: m.liderDireta !== -1 ? cols[m.liderDireta] : '',
           lider12: m.lider12 !== -1 ? cols[m.lider12] : '',
           batizada: batizadaBoolean ? BaptismStatus.BATIZADA : BaptismStatus.NAO_BATIZADA,
-          dataBatismo: m.dataBatismo !== -1 ? cols[m.dataBatismo] : '',
+          dataBatismo: m.dataBatismo !== -1 ? convertDate(cols[m.dataBatismo]) : '',
           fezUV: m.fezUV !== -1 ? isSim(cols[m.fezUV]) : false,
-          dataInscricaoUV: m.dataInscricaoUV !== -1 ? cols[m.dataInscricaoUV] : '',
-          dataConclusaoUV: m.dataConclusaoUV !== -1 ? cols[m.dataConclusaoUV] : '',
+          dataInscricaoUV: m.dataInscricaoUV !== -1 ? convertDate(cols[m.dataInscricaoUV]) : '',
+          dataConclusaoUV: m.dataConclusaoUV !== -1 ? convertDate(cols[m.dataConclusaoUV]) : '',
           fezEncontro: m.fezEncontro !== -1 ? isSim(cols[m.fezEncontro]) : false,
-          dataConclusaoEncontro: m.dataConclusaoEncontro !== -1 ? cols[m.dataConclusaoEncontro] : '',
+          dataConclusaoEncontro: m.dataConclusaoEncontro !== -1 ? convertDate(cols[m.dataConclusaoEncontro]) : '',
           fezCD: m.fezCD !== -1 ? isSim(cols[m.fezCD]) : false,
           cdStatus: m.cdStatus !== -1 ? (cols[m.cdStatus] as CDLevel) : CDLevel.NAO_INICIOU,
           coresPreferidas: m.coresPreferidas !== -1 ? cols[m.coresPreferidas] : '',
@@ -341,10 +362,14 @@ const Disciples: React.FC = () => {
           status: 'Ativa',
           isLeader: false
         };
-        imported.push(d);
 
+        // Calculate Age if birth date exists
+        if (d.dataAniversario) {
+          d.idade = calculateAge(d.dataAniversario);
+        }
+
+        imported.push(d);
         existingNames.add(normalize(nomeVal));
-        if (wppClean.length > 5) existingWhats.add(wppClean);
       });
 
       if (imported.length > 0) {
@@ -545,8 +570,15 @@ const Disciples: React.FC = () => {
     <div className="space-y-4 animate-in pb-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
         <div className="text-left">
-          <h1 className="text-2xl md:text-3xl font-black uppercase text-gray-900 leading-tight">Peregrinas</h1>
-          <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Gestão de Rebanho</p>
+          <h1 className="text-2xl md:text-3xl font-black uppercase text-gray-900 leading-tight flex items-center gap-4">
+            Peregrinas
+            <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-lg text-[10px] font-black tabular-nums">
+              Total: {totalCount}
+            </span>
+          </h1>
+          <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">
+            Gestão de Rebanho • Página {page + 1} de {Math.ceil(totalCount / 20) || 1}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
           <label className="flex-1 md:flex-none cursor-pointer bg-blue-50 text-blue-600 px-4 py-3 rounded-xl font-black text-[10px] uppercase shadow-sm border border-blue-100 hover:bg-blue-500 hover:text-white transition-all flex items-center justify-center gap-2">
@@ -712,7 +744,7 @@ const Disciples: React.FC = () => {
             </button>
             <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Página {page + 1}</span>
             <button
-              disabled={filtered.length < 20}
+              disabled={disciples.length < 20 || (page + 1) * 20 >= totalCount}
               onClick={() => setPage(p => p + 1)}
               className="px-4 py-2 bg-black text-white text-xs font-black uppercase tracking-widest rounded-xl disabled:opacity-50 transition-all shadow-md"
             >
@@ -818,7 +850,7 @@ const Disciples: React.FC = () => {
             </button>
             <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Página {page + 1}</span>
             <button
-              disabled={filtered.length < 20}
+              disabled={disciples.length < 20 || (page + 1) * 20 >= totalCount}
               onClick={() => setPage(p => p + 1)}
               className="px-4 py-2 bg-black text-white text-xs font-black uppercase tracking-widest rounded-xl disabled:opacity-50 transition-all shadow-md"
             >

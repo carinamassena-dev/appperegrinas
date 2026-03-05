@@ -8,7 +8,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { logAction } from '../services/auditService';
-import { loadData, saveRecord, generateFullSystemBackup } from '../services/dataService';
+import { loadData, saveRecord, deleteRecord, generateFullSystemBackup } from '../services/dataService';
+import { supabaseService } from '../services/supabaseService';
 import { Loader2, Key, Smartphone, Mail as MailIcon } from 'lucide-react';
 
 const ProfileSettings: React.FC = () => {
@@ -173,11 +174,60 @@ const ProfileSettings: React.FC = () => {
                 </button>
                 <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportBackup} />
 
-                <button onClick={resetDatabase} className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 rounded-2xl flex items-center gap-4 px-6 transition-all border border-red-500/20">
-                  <RefreshCcw size={18} className="text-red-500" />
+                <button
+                  onClick={async () => {
+                    if (!confirm("Isso removerá peregrinas com o mesmo nome (mantendo apenas uma). Deseja continuar?")) return;
+                    setIsSaving(true);
+                    try {
+                      // Usar o supabaseService já importado
+                      const all = await supabaseService.getAll('peregrinas');
+                      const seen = new Set();
+                      const toDelete: string[] = [];
+                      const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+                      all.forEach((d: any) => {
+                        const n = normalize(d.nome);
+                        if (seen.has(n)) toDelete.push(d.id);
+                        else seen.add(n);
+                      });
+
+                      if (toDelete.length === 0) {
+                        alert("Nenhuma duplicata encontrada.");
+                      } else {
+                        if (confirm(`Encontradas ${toDelete.length} duplicatas. Confirmar exclusão?`)) {
+                          for (const id of toDelete) await deleteRecord('disciples', id);
+                          alert(`${toDelete.length} duplicatas removidas com sucesso!`);
+                          window.location.reload();
+                        }
+                      }
+                    } catch (e) {
+                      console.error(e);
+                      alert("Erro ao limpar duplicatas.");
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                  className="w-full py-4 bg-purple-500/10 hover:bg-purple-500/20 rounded-2xl flex items-center gap-4 px-6 transition-all border border-purple-500/20"
+                >
+                  <RefreshCcw size={18} className="text-purple-400" />
                   <div className="text-left">
-                    <p className="text-xs font-black uppercase text-red-500">Limpeza de Cache</p>
-                    <p className="text-[9px] opacity-40 text-red-500/60">Resetar Peregrinas e Líderes</p>
+                    <p className="text-xs font-black uppercase text-purple-400">Limpar Duplicatas</p>
+                    <p className="text-[9px] opacity-40 text-purple-400/60">Remover cadastros com nomes repetidos</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    localStorage.clear();
+                    alert("Cache local limpo! O sistema recarregará os dados do servidor.");
+                    window.location.reload();
+                  }}
+                  className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 rounded-2xl flex items-center gap-4 px-6 transition-all border border-red-500/20"
+                >
+                  <HardDrive size={18} className="text-red-500" />
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase text-red-500">Limpar Cache Local</p>
+                    <p className="text-[9px] opacity-40 text-red-500/60">Forçar recarregamento completo dos dados</p>
                   </div>
                 </button>
               </div>

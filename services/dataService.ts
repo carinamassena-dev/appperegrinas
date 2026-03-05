@@ -121,40 +121,42 @@ export async function loadDisciplesList(page: number = 0, limit: number = 20, se
 
     const now = Date.now();
 
-    // Check Local Storage Cache first
-    const cachedItemStr = localStorage.getItem('cached_disciplesList');
+    // Dynamic Cache Key to support Pagination & Search
+    const cacheKey = `disciplesList_${page}_${searchTerm}`;
+    const lsKey = `cached_${cacheKey}`;
+
+    // Check In-Memory Cache first (Fastest)
+    if (memoryCache[cacheKey] && (now - memoryCache[cacheKey].timestamp < CACHE_LIFETIME)) {
+        console.log(`[Cache Hit] Poupando Egress de: ${cacheKey}`);
+        return memoryCache[cacheKey].data;
+    }
+
+    // Check Local Storage Cache (Survives Refresh)
+    const cachedItemStr = localStorage.getItem(lsKey);
     if (cachedItemStr) {
         try {
             const cachedItem = JSON.parse(cachedItemStr);
             if (now - cachedItem.timestamp < CACHE_LIFETIME) {
-                console.log(`[Cache Hit] Poupando Egress de: disciplesList (via localStorage)`);
-                // Populate memory cache to avoid parsing again if called rapidly
-                memoryCache['disciplesList'] = cachedItem;
+                console.log(`[Cache Hit] Poupando Egress de: ${cacheKey} (via LocalStorage)`);
+                memoryCache[cacheKey] = cachedItem;
                 return cachedItem.data;
-            } else {
-                localStorage.removeItem('cached_disciplesList');
             }
         } catch (e) {
-            localStorage.removeItem('cached_disciplesList');
+            localStorage.removeItem(lsKey);
         }
     }
 
-    if (memoryCache['disciplesList'] && (now - memoryCache['disciplesList'].timestamp < CACHE_LIFETIME)) {
-        console.log(`[Cache Hit] Poupando Egress de: disciplesList`);
-        return memoryCache['disciplesList'].data;
-    }
-
     try {
-        console.log('[Data Fetch] Carregando lista de discípulos do banco...');
+        console.log(`[Data Fetch] Carregando ${cacheKey} do banco...`);
         const data = await supabaseService.getDisciplesList(page, limit, searchTerm);
         const cacheObj = { data: data || [], timestamp: now };
-        memoryCache['disciplesList'] = cacheObj;
+        memoryCache[cacheKey] = cacheObj;
 
         // Save to Local Storage for next browser session
         try {
-            localStorage.setItem('cached_disciplesList', JSON.stringify(cacheObj));
+            localStorage.setItem(lsKey, JSON.stringify(cacheObj));
         } catch (e) {
-            console.warn('[Cache] Falha ao salvar no localStorage (possível limite de quota)', e);
+            console.warn(`[Cache] Falha ao salvar ${cacheKey} no localStorage`, e);
         }
 
         return data;
@@ -225,8 +227,13 @@ export async function saveRecord(module: keyof typeof TABLES, item: any): Promis
         delete memoryCache[module];
         localStorage.removeItem(`cached_${module}`);
         if (module === 'disciples') {
-            delete memoryCache['disciplesList'];
-            localStorage.removeItem('cached_disciplesList');
+            // Invalidate ALL disciplesList caches when a record is saved or deleted
+            Object.keys(memoryCache).forEach(key => {
+                if (key.startsWith('disciplesList')) delete memoryCache[key];
+            });
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('cached_disciplesList')) localStorage.removeItem(key);
+            });
         }
     } catch (err) {
         console.error(`[DataService] Erro ao salvar em ${module}:`, err);
@@ -263,9 +270,14 @@ export async function deleteRecord(module: keyof typeof TABLES, id: string): Pro
 
     try {
         await supabaseService.delete(table, id);
-        delete memoryCache[module];
-        delete memoryCache[`${module}List`];
         localStorage.removeItem(`cached_${module}`);
+        // Invalidate specialized list caches too
+        Object.keys(memoryCache).forEach(key => {
+            if (key.startsWith('disciplesList')) delete memoryCache[key];
+        });
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('cached_disciplesList')) localStorage.removeItem(key);
+        });
     } catch (err) {
         console.error(`[DataService] Erro ao deletar de ${module}:`, err);
     }
