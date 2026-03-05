@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import {
   Users, ShieldCheck, Database, Save,
@@ -50,11 +49,15 @@ const AdminPanel: React.FC = () => {
         supabaseService.getFinance(),
         supabaseService.getHarvest()
       ]);
+      const disciplesList = d || [];
+      const financeList = f || [];
+      const harvestList = h || [];
+
       setStats({
-        disciples: d.length,
-        leaders: d.filter((x: any) => x.isLeader).length,
-        finance: f.length,
-        harvest: h.length,
+        disciples: disciplesList.length,
+        leaders: disciplesList.filter((x: any) => x.isLeader).length,
+        finance: financeList.length,
+        harvest: harvestList.length,
         events: 0
       });
     } catch (err) {
@@ -66,11 +69,11 @@ const AdminPanel: React.FC = () => {
     const fetchData = async () => {
       // Load users from Supabase
       const supaUsers = await loadData<UserAccount>('users');
-      setUsers(supaUsers);
+      setUsers(supaUsers || []);
 
       // Load audit logs from Supabase
       const logs = await getAuditLogs();
-      setSystemLogs(logs);
+      setSystemLogs(logs || []);
 
       updateStats();
     };
@@ -140,7 +143,7 @@ const AdminPanel: React.FC = () => {
   };
 
   const filteredLogs = systemLogs.filter(log => {
-    const matchUser = !logFilters.user || log.user.toLowerCase().includes(logFilters.user.toLowerCase());
+    const matchUser = !logFilters.user || (log.user && log.user.toLowerCase().includes(logFilters.user.toLowerCase()));
     const matchType = !logFilters.type || log.type === logFilters.type;
     const logDate = new Date(log.timestamp).toISOString().split('T')[0];
     const matchStart = !logFilters.startDate || logDate >= logFilters.startDate;
@@ -304,10 +307,10 @@ const AdminPanel: React.FC = () => {
               <div key={u.id} className="bg-white p-6 rounded-[2rem] border shadow-sm flex flex-col gap-6 group hover:border-lime-300 transition-colors">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center font-black text-gray-400 text-xl border-2 border-dashed">{u.nome?.charAt(0) || u.username.charAt(0)}</div>
+                    <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center font-black text-gray-400 text-xl border-2 border-dashed">{u.nome?.charAt(0) || u.username?.charAt(0) || '?'}</div>
                     <div className="min-w-0">
                       <h3 className="font-black uppercase text-sm text-gray-900 truncate">{u.nome || 'Sem Nome'}</h3>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">@{u.username}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">@{u.username || 'unknown'}</p>
                     </div>
                   </div>
                   <span className={`px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-tighter ${u.role === 'Master' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
