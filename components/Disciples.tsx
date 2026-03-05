@@ -57,9 +57,9 @@ const Disciples: React.FC = () => {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  const { data: disciples = [], isLoading, mutate } = useSWR(['/api/disciples', page, serverSearchTerm], async () => {
+  const { data: disciples = [], isLoading, mutate } = useSWR(['/api/disciples', page, serverSearchTerm, viewMode], async () => {
     console.time('fetch-cadastros');
-    const data = await loadDisciplesList(page, 20, serverSearchTerm);
+    const data = await loadDisciplesList(page, 20, serverSearchTerm, viewMode === 'folder');
     console.timeEnd('fetch-cadastros');
     return data as Disciple[];
   }, { revalidateOnFocus: true });
