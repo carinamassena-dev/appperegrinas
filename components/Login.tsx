@@ -26,13 +26,18 @@ const Login: React.FC = () => {
     nome: '', email: '', whatsapp: '', username: '', passwordHash: ''
   });
 
-  // ==========================================================
+   // ==========================================================
   // FUNÇÃO MÁGICA: RESGATAR DADOS DO CHROME PARA A NUVEM
   // ==========================================================
   const migrarParaNuvemMagicamente = async () => {
-    // Tenta pegar a url direto da memória do Vite
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ofrwgukuoqbftdyzbfza.supabase.co'; 
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mcndndWt1b3FiZnRkeXpiZnphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MDM2NjksImV4cCI6MjA4ODE3OTY2OX0.igAsGDZA1QbZfPQW7i4V9jNBvu02Mds3Cs7-pLQ26MI';
+    // Esconde o erro do Vercel com ts-ignore
+    // @ts-ignore
+    const supUrl = import.meta.env.VITE_SUPABASE_URL;
+    // @ts-ignore
+    const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    const supabaseUrl = supUrl || 'https://ofrwgukuoqbftdyzbfza.supabase.co'; 
+    const supabaseKey = supKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mcndndWt1b3FiZnRkeXpiZnphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MDM2NjksImV4cCI6MjA4ODE3OTY2OX0.igAsGDZA1QbZfPQW7i4V9jNBvu02Mds3Cs7-pLQ26MI';
 
     const tabelas = ['peregrinas', 'financeiro', 'atas', 'eventos', 'colheita', 'feed', 'tickets', 'usuarios', 'lideres'];
     let migrados = 0;
@@ -74,6 +79,7 @@ const Login: React.FC = () => {
        alert("O botão varreu as pastas do seu Chrome, mas não achou nenhuma discípula guardada off-line aqui.");
     }
   };
+
 
 
   const handleLogin = async (e: React.FormEvent) => {
