@@ -95,7 +95,7 @@ const AdminPanel: React.FC = () => {
 
     if (userData.id) {
       changedUser = userData as UserAccount;
-      updatedUsers = users.map(u => u.id === changedUser.id ? changedUser : u);
+      updatedUsers = users.map(u => (u && u.id === changedUser.id) ? changedUser : u);
       addAuditLog("Usuário Editado", `Perfil @${changedUser.username} alterado`, "USUARIO");
     } else {
       changedUser = {
@@ -117,7 +117,7 @@ const AdminPanel: React.FC = () => {
   const handleApproveUser = async (userToApprove: UserAccount) => {
     if (!confirm(`Deseja aprovar o acesso de ${userToApprove.nome}?`)) return;
     const updatedUser = { ...userToApprove, status: 'active' } as UserAccount;
-    const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
+    const updatedUsers = users.map(u => (u && u.id === updatedUser.id) ? updatedUser : u);
     setUsers(updatedUsers);
     await saveRecord('users', updatedUser);
     addAuditLog("Acesso Aprovado", `Solicitação de @${updatedUser.username} foi aprovada.`, "USUARIO");
@@ -125,7 +125,7 @@ const AdminPanel: React.FC = () => {
 
   const handleRejectUser = async (userToReject: UserAccount) => {
     if (!confirm(`Deseja RECUSAR e apagar a solicitação de ${userToReject.nome}?`)) return;
-    const updatedUsers = users.filter(u => u.id !== userToReject.id);
+    const updatedUsers = users.filter(u => u && u.id !== userToReject.id);
     setUsers(updatedUsers);
     await deleteRecord('users', userToReject.id);
     addAuditLog("Acesso Recusado", `Solicitação de @${userToReject.username} foi rejeitada e apagada.`, "USUARIO");
@@ -135,8 +135,8 @@ const AdminPanel: React.FC = () => {
     if (id === currentUser?.id) return alert("Você não pode excluir a si mesmo!");
     if (!confirm("Deseja realmente excluir este usuário?")) return;
 
-    const userToDelete = users.find(u => u.id === id);
-    const updatedUsers = users.filter(u => u.id !== id);
+    const userToDelete = users.find(u => u && u.id === id);
+    const updatedUsers = users.filter(u => u && u.id !== id);
     setUsers(updatedUsers);
     await deleteRecord('users', id);
     addAuditLog("Usuário Excluído", `Usuário @${userToDelete?.username} removido do sistema`, "USUARIO");
@@ -162,9 +162,9 @@ const AdminPanel: React.FC = () => {
           <button onClick={() => setActiveTab('users')} className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-black text-white shadow-lg' : 'text-gray-400'}`}>Acessos</button>
           <button onClick={() => setActiveTab('requests')} className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative ${activeTab === 'requests' ? 'bg-black text-white shadow-lg' : 'text-gray-400'}`}>
             Solicitações
-            {users.filter(u => u?.status === 'pending').length > 0 && (
+            {users.filter(u => u && u.status === 'pending').length > 0 && (
               <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
-                {users.filter(u => u?.status === 'pending').length}
+                {users.filter(u => u && u.status === 'pending').length}
               </span>
             )}
           </button>
@@ -261,7 +261,7 @@ const AdminPanel: React.FC = () => {
                   <p className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-2">
                     <CheckCircle2 size={14} /> Configurado via Vercel (Auto)
                   </p>
-                  <p className="text-[9px] text-green-600 mt-1">A URL e Key estão sendo carregadas das variáveis de ambiente automatically. Todos os dados são sincronizados em tempo real.</p>
+                  <p className="text-[9px] text-green-600 mt-1">A URL e Key estão sendo carregadas das variáveis de ambiente automaticamente. Todos os dados são sincronizados em tempo real.</p>
                 </div>
               </div>
             </div>
@@ -303,7 +303,7 @@ const AdminPanel: React.FC = () => {
           </button>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {users.filter(u => u?.status !== 'pending').map(u => (
+            {users.filter(u => u && u.status !== 'pending').map(u => (
               <div key={u.id} className="bg-white p-6 rounded-[2rem] border shadow-sm flex flex-col gap-6 group hover:border-lime-300 transition-colors">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-4">
@@ -429,7 +429,7 @@ const AdminPanel: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {users.filter(u => u?.status === 'pending').map(u => (
+              {users.filter(u => u && u.status === 'pending').map(u => (
                 <div key={u.id} className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 flex flex-col gap-6">
                   <div>
                     <h3 className="font-black uppercase text-sm text-gray-900">{u?.nome || 'Sem Nome'}</h3>
@@ -452,7 +452,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                 </div>
               ))}
-              {users.filter(u => u?.status === 'pending').length === 0 && (
+              {users.filter(u => u && u.status === 'pending').length === 0 && (
                 <div className="col-span-full py-12 text-center border-2 border-dashed border-gray-100 rounded-3xl">
                   <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Nenhuma solicitação pendente.</p>
                 </div>
