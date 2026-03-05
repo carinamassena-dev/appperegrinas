@@ -147,6 +147,10 @@ export async function getDiscipleByName(name: string): Promise<any | null> {
 }
 
 // Amigo Secreto Funções
+export async function loadDisciplesForAmigoSecreto(): Promise<any[]> {
+    return await supabaseService.getDisciplesForAmigoSecreto();
+}
+
 export async function saveAmigoSecretoBatch(records: any[]): Promise<void> {
     return await supabaseService.saveAmigoSecretoBatch(records);
 }

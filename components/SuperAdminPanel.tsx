@@ -52,7 +52,7 @@ const SuperAdminPanel: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-in fade-in">
-                <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
+                <Loader2 className="w-12 h-12 text-lime-500 animate-spin" />
                 <p className="text-gray-400 font-bold uppercase tracking-widest text-sm">Carregando Tenants...</p>
             </div>
         );
@@ -60,22 +60,22 @@ const SuperAdminPanel: React.FC = () => {
 
     return (
         <div className="space-y-6 md:space-y-8 animate-in pb-10">
-            <div className="bg-indigo-900 rounded-[2.5rem] p-8 md:p-12 text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="absolute top-0 right-0 p-8 text-indigo-800/50 pointer-events-none">
+            <div className="bg-black rounded-[2.5rem] p-8 md:p-12 text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 border-b-[6px] border-lime-peregrinas">
+                <div className="absolute top-0 right-0 p-8 text-gray-800 pointer-events-none opacity-50">
                     <ShieldAlert size={160} />
                 </div>
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-4">
-                        <span className="bg-indigo-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+                        <span className="bg-lime-500 text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
                             Global Master
                         </span>
                     </div>
                     <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight leading-tight">Painel Root <br /> Multi-Tenant</h1>
-                    <p className="text-indigo-200 mt-4 font-medium italic max-w-md">Gerencie todas as igrejas e organizações instanciadas no sistema.</p>
+                    <p className="text-gray-400 mt-4 font-medium italic max-w-md">Gerencie todas as igrejas e organizações instanciadas no sistema.</p>
                 </div>
                 <button
                     onClick={() => setShowModal(true)}
-                    className="relative z-10 bg-white text-indigo-900 px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center gap-2 shadow-xl hover:scale-105 transition-all w-full md:w-auto text-center justify-center"
+                    className="relative z-10 bg-white text-black px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center gap-2 shadow-xl hover:scale-105 active:scale-95 hover:bg-lime-50 transition-all w-full md:w-auto text-center justify-center"
                 >
                     <Plus size={18} /> Instanciar Organização
                 </button>
@@ -83,9 +83,9 @@ const SuperAdminPanel: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {organizations.map(org => (
-                    <div key={org.id} className="bg-white border p-6 rounded-[2rem] shadow-sm hover:shadow-xl transition-all space-y-6 flex flex-col">
+                    <div key={org.id} className="bg-white border p-6 rounded-[2rem] shadow-sm hover:shadow-xl hover:border-lime-200 transition-all space-y-6 flex flex-col group">
                         <div className="flex items-start justify-between">
-                            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+                            <div className="w-12 h-12 bg-lime-50 text-lime-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <Building2 size={24} />
                             </div>
                             <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 mt-2">
@@ -101,7 +101,7 @@ const SuperAdminPanel: React.FC = () => {
                                 onClick={() => copyInviteLink(org.id)}
                                 className={`w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all border ${copiedId === org.id
                                     ? 'bg-green-50 border-green-200 text-green-600'
-                                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200'
+                                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-lime-50 hover:text-lime-600 hover:border-lime-200'
                                     }`}
                             >
                                 {copiedId === org.id ? <CheckCircle size={14} /> : <Copy size={14} />}
@@ -118,7 +118,7 @@ const SuperAdminPanel: React.FC = () => {
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
                     <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 space-y-6 shadow-2xl relative">
                         <div className="text-center space-y-2">
-                            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4">
+                            <div className="w-16 h-16 bg-lime-50 text-lime-600 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 border border-lime-100">
                                 <Building2 size={32} />
                             </div>
                             <h2 className="text-2xl font-black uppercase tracking-tighter text-gray-900">Nova Instância</h2>
@@ -129,7 +129,7 @@ const SuperAdminPanel: React.FC = () => {
                             <input
                                 autoFocus
                                 type="text"
-                                className="w-full p-4 bg-gray-50 border-2 border-transparent focus:border-indigo-300 rounded-2xl outline-none font-bold transition-all text-sm"
+                                className="w-full p-4 bg-gray-50 border-2 border-transparent focus:border-black rounded-2xl outline-none font-bold transition-all text-sm"
                                 placeholder="Ex: Comunidade Videira VIP"
                                 value={newOrgName}
                                 onChange={e => setNewOrgName(e.target.value)}
@@ -137,11 +137,11 @@ const SuperAdminPanel: React.FC = () => {
                             />
                         </div>
                         <div className="flex gap-3 pt-4 border-t">
-                            <button onClick={() => setShowModal(false)} className="flex-1 py-4 text-gray-400 font-black uppercase tracking-widest text-[10px]">Cancelar</button>
+                            <button onClick={() => setShowModal(false)} className="flex-1 py-4 text-gray-400 hover:bg-gray-100 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-colors">Cancelar</button>
                             <button
                                 onClick={handleSaveOrg}
                                 disabled={isSaving || !newOrgName.trim()}
-                                className="flex-[2] bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                                className="flex-[2] bg-lime-400 text-black rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:bg-lime-500 disabled:opacity-50 transition-all flex items-center justify-center gap-2 border border-lime-500"
                             >
                                 {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Instanciar
                             </button>

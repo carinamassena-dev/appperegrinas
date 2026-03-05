@@ -214,6 +214,31 @@ export const supabaseService = {
         return (data || []).map((row: any) => row.record);
     },
 
+    // Ultra-lightweight fetch for Amigo Secreto (Egress Saver)
+    async getDisciplesForAmigoSecreto() {
+        if (!supabase) return [];
+        const orgId = getMyOrgId();
+        let query = supabase
+            .from('peregrinas')
+            .select(`
+                id,
+                nome:record->>nome,
+                whatsapp:record->>whatsapp,
+                liderDireta:record->>liderDireta
+            `)
+            .eq('record->>status', 'Ativa');
+
+        if (orgId) query = query.eq('organization_id', orgId);
+
+        const { data, error } = await query;
+
+        if (error) {
+            console.error('[Supabase Error] getDisciplesForAmigoSecreto:', error);
+            return [];
+        }
+        return data as any[];
+    },
+
     // Optimized Search for modal / selects (3 letters minimum)
     async searchDisciplesByName(term: string) {
         if (!supabase || term.trim().length < 3) return [];

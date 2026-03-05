@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect } from 'react';
 import { Gift, Search, Send, CheckCircle, RefreshCcw, Loader2, ArrowRight } from 'lucide-react';
 import { AuthContext } from '../App';
 import { supabaseService } from '../services/supabaseService';
-import { getHistoricoSorteiosAmigoSecreto, saveAmigoSecretoBatch } from '../services/dataService';
+import { getHistoricoSorteiosAmigoSecreto, saveAmigoSecretoBatch, loadDisciplesForAmigoSecreto } from '../services/dataService';
 import { Disciple } from '../types';
 
 export const AmigoSecreto: React.FC = () => {
@@ -22,9 +22,8 @@ export const AmigoSecreto: React.FC = () => {
     const loadData = async () => {
         setIsLoading(true);
         try {
-            // Buscando todas as discípulas da Org (Usar getAll para pegar tudo sem paginação aqui, pois sorteio precisa de todos os nomes)
-            const allD = await supabaseService.getAll('peregrinas');
-            const ativas = allD.filter((d: any) => d.status === 'Ativa');
+            // Buscando apenas dados essenciais via endpoint ultra leve
+            const ativas = await loadDisciplesForAmigoSecreto();
             setDisciples(ativas);
 
             const hist = await getHistoricoSorteiosAmigoSecreto();
@@ -158,16 +157,17 @@ export const AmigoSecreto: React.FC = () => {
                     </h1>
                     <p className="text-gray-400 font-bold text-xs uppercase tracking-widest mt-1">Sorteio Inteligente com Revelação via Link</p>
                 </div>
-                {selectedIds.size >= 3 && (
-                    <button
-                        onClick={handleSortear}
-                        disabled={isDrawing}
-                        className="bg-black text-white px-6 py-4 rounded-xl font-black text-xs uppercase shadow-xl flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all w-full md:w-auto"
-                    >
-                        {isDrawing ? <Loader2 size={18} className="animate-spin" /> : <RefreshCcw size={18} />}
-                        Realizar Sorteio ({selectedIds.size})
-                    </button>
-                )}
+                <button
+                    onClick={handleSortear}
+                    disabled={isDrawing || selectedIds.size < 3}
+                    className={`px-6 py-4 rounded-xl font-black text-xs uppercase shadow-lg flex items-center justify-center gap-2 transition-all w-full md:w-auto ${selectedIds.size >= 3
+                        ? 'bg-black text-white hover:scale-105 active:scale-95 cursor-pointer'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-70'
+                        }`}
+                >
+                    {isDrawing ? <Loader2 size={18} className="animate-spin" /> : <RefreshCcw size={18} />}
+                    Realizar Sorteio ({selectedIds.size})
+                </button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-1">
