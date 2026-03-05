@@ -78,6 +78,21 @@ export const supabaseService = {
         return (data || []).map((row: any) => row.record);
     },
 
+    // Get Count Header Only (Extreme Egress Saver)
+    async getCount(table: string): Promise<number> {
+        if (!supabase) return 0;
+        const orgId = getMyOrgId();
+        let query = supabase.from(table).select('*', { count: 'exact', head: true });
+        if (orgId) query = query.eq('organization_id', orgId);
+
+        const { count, error } = await query;
+        if (error) {
+            console.error(`[Supabase Count Error] Table: ${table}`, error);
+            return 0;
+        }
+        return count || 0;
+    },
+
     // Generic Delete
     async delete(table: string, id: string) {
         if (!supabase) throw new Error("Supabase não configurado.");
@@ -146,6 +161,9 @@ export const supabaseService = {
                 idade:record->idade,
                 dataAniversario:record->>dataAniversario,
                 cdStatus:record->>cdStatus,
+                dataBatismo:record->>dataBatismo,
+                dataConclusaoEncontro:record->>dataConclusaoEncontro,
+                dataConclusaoCD:record->>dataConclusaoCD,
                 celula1:record->celula1,
                 celula2:record->celula2,
                 fazMaisDeUmaCelula:record->fazMaisDeUmaCelula
@@ -164,6 +182,25 @@ export const supabaseService = {
 
         // Return a mapped lightweight list
         return data as any[];
+    },
+
+    // Dedicated fetch for Leaders only
+    async getLeaders() {
+        if (!supabase) return [];
+        const orgId = getMyOrgId();
+        let query = supabase.from('peregrinas')
+            .select('id, record')
+            .eq('record->isLeader', true)
+            .order('id', { ascending: true });
+
+        if (orgId) query = query.eq('organization_id', orgId);
+
+        const { data, error } = await query;
+        if (error) {
+            console.error('[Supabase Error] getLeaders:', error);
+            return [];
+        }
+        return (data || []).map((row: any) => row.record);
     },
 
     // Optimized Search for modal / selects (3 letters minimum)

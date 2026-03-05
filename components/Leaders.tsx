@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { Leader, Disciple } from '../types';
 import { sendDataToSheet } from '../services/googleSheetsService';
-import { loadData, saveRecord, deleteRecord } from '../services/dataService';
+import { loadData, saveRecord, deleteRecord, loadDisciplesList } from '../services/dataService';
+import { supabaseService } from '../services/supabaseService';
 
 declare const L: any;
 
@@ -41,9 +42,10 @@ const Leaders: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const allDisciples = await loadData<Disciple>('disciples');
+        const allDisciples = await loadDisciplesList();
         setDisciples(allDisciples);
-        setLeaders(allDisciples.filter(d => d.isLeader) as Leader[]);
+        const allLeaders = await supabaseService.getLeaders();
+        setLeaders(allLeaders);
       } catch (err) {
         console.error('Erro ao carregar líderes:', err);
       }

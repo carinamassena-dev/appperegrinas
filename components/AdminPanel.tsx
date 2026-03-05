@@ -11,7 +11,7 @@ import { UserAccount, BaptismStatus, CDLevel, TransactionType, Disciple, Leader,
 import { AuthContext } from '../App';
 import { fetchSheetCSV, parseCSV, sendDataToSheet } from '../services/googleSheetsService';
 import { supabaseService } from '../services/supabaseService';
-import { loadData, saveRecord, deleteRecord } from '../services/dataService';
+import { loadData, saveRecord, deleteRecord, loadDisciplesList } from '../services/dataService';
 import { refreshSupabaseClient } from '../services/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { getAuditLogs, getCachedAuditLogs, logAction, AuditLog, AuditLogType } from '../services/auditService';
@@ -45,20 +45,18 @@ const AdminPanel: React.FC = () => {
 
   const updateStats = async () => {
     try {
-      const [d, f, h] = await Promise.all([
-        supabaseService.getDisciples(),
-        supabaseService.getFinance(),
-        supabaseService.getHarvest()
+      const [disciplesList, financeCount, harvestCount] = await Promise.all([
+        loadDisciplesList(),
+        supabaseService.getCount('financeiro'),
+        supabaseService.getCount('colheita')
       ]);
-      const disciplesList = d || [];
-      const financeList = f || [];
-      const harvestList = h || [];
+      const validDisciples = disciplesList || [];
 
       setStats({
-        disciples: disciplesList.length,
-        leaders: disciplesList.filter((x: any) => x.isLeader).length,
-        finance: financeList.length,
-        harvest: harvestList.length,
+        disciples: validDisciples.length,
+        leaders: validDisciples.filter((x: any) => x.isLeader).length,
+        finance: financeCount,
+        harvest: harvestCount,
         events: 0
       });
     } catch (err) {

@@ -6,7 +6,7 @@ import {
   Star, Zap, ArrowRight, UserCheck, Activity, Bell, X, MessageCircle, Phone, Heart, Loader2
 } from 'lucide-react';
 import { Disciple, BaptismStatus, CDLevel, Leader } from '../types';
-import { loadData } from '../services/dataService';
+import { loadDisciplesList } from '../services/dataService';
 
 const Dashboard: React.FC = () => {
   const [verse] = useState({ texto: "Lâmpada para os meus pés é tua palavra e luz, para o meu caminho.", referencia: "Salmos 119:105" });
@@ -20,7 +20,7 @@ const Dashboard: React.FC = () => {
     const fetchData = async () => {
       console.log('[Dashboard] tela carregada');
       try {
-        const list = await loadData<Disciple>('disciples');
+        const list = await loadDisciplesList();
         setDisciples(list);
         setLeaders(list.filter((d: any) => d.isLeader) as Leader[]);
       } catch (err) {
