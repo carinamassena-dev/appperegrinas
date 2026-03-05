@@ -46,19 +46,19 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({
     });
 
     return (
-        <div className="bg-[#FFF5F8] rounded-3xl shadow-sm border border-pink-100 overflow-hidden font-sans">
-            {/* Header Mimoso */}
-            <div className="bg-gradient-to-r from-pink-400 to-purple-400 p-6 text-white flex justify-between items-center">
-                <button onClick={() => setMesAtual(subMonths(mesAtual, 1))}>
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden font-sans">
+            {/* Header Institucional */}
+            <div className="bg-black p-6 text-white flex justify-between items-center border-b-[6px] border-lime-peregrinas">
+                <button onClick={() => setMesAtual(subMonths(mesAtual, 1))} className="hover:text-lime-peregrinas transition-colors">
                     <ChevronLeft />
                 </button>
                 <div className="text-center">
-                    <h2 className="text-xl font-bold capitalize">
+                    <h2 className="text-xl font-black capitalize tracking-tight uppercase">
                         {format(mesAtual, 'MMMM yyyy', { locale: ptBR })}
                     </h2>
-                    <p className="text-xs opacity-90 italic">Planejamento das Peregrinas 🌸</p>
+                    <p className="text-[10px] text-lime-400 font-bold uppercase tracking-widest mt-1">Agenda da Geração</p>
                 </div>
-                <button onClick={() => setMesAtual(addMonths(mesAtual, 1))}>
+                <button onClick={() => setMesAtual(addMonths(mesAtual, 1))} className="hover:text-lime-peregrinas transition-colors">
                     <ChevronRight />
                 </button>
             </div>
@@ -82,12 +82,12 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({
                         <div
                             key={dia.toString()}
                             className={`min-h-[80px] p-1 rounded-xl border transition-all ${ehHoje
-                                    ? 'bg-white border-pink-300 shadow-inner'
-                                    : 'bg-white/50 border-gray-50'
+                                    ? 'bg-lime-50 border-lime-300 shadow-inner'
+                                    : 'bg-white border-gray-100'
                                 }`}
                         >
                             <span
-                                className={`text-[10px] font-bold ${ehHoje ? 'text-pink-500' : 'text-gray-400'
+                                className={`text-[10px] font-black ${ehHoje ? 'text-lime-700' : 'text-gray-400'
                                     }`}
                             >
                                 {format(dia, 'd')}
@@ -97,7 +97,7 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({
                                 {eventosDoDia.map((ev) => (
                                     <div
                                         key={ev.id}
-                                        className="bg-purple-100 text-purple-700 text-[9px] p-1 rounded-md leading-tight border border-purple-200"
+                                        className="bg-gray-900 text-lime-400 text-[9px] p-1.5 rounded-md leading-tight border border-black font-bold uppercase tracking-tighter"
                                     >
                                         {ev.titulo}
                                     </div>
@@ -108,9 +108,9 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({
                             {(userRole === 'Master' || userRole === 'Líder') && (
                                 <button
                                     onClick={() => onAddEvento(dia)}
-                                    className="w-full mt-1 opacity-0 hover:opacity-100 flex justify-center text-pink-300 transition-opacity"
+                                    className="w-full mt-1 opacity-0 hover:opacity-100 flex justify-center text-lime-600 transition-opacity"
                                 >
-                                    <Plus size={12} />
+                                    <Plus size={12} strokeWidth={3} />
                                 </button>
                             )}
                         </div>
