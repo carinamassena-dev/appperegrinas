@@ -3,14 +3,12 @@ import { HashRouter, Routes, Route, Link, useLocation, Navigate, useNavigate } f
 import {
   Users, Sprout, DollarSign, Calendar,
   Menu, X, Flower2, ShieldCheck,
-  Home as HomeIcon, Activity, LogOut, MapPin, Gift, HelpCircle,
+  Home as HomeIcon, Activity, LogOut, MapPin, Gift,
   BarChart3, QrCode, BookOpen, GraduationCap, ClipboardList, UserCircle, MoreHorizontal, MessageSquarePlus, Mail, Calculator, MessageSquare
 } from 'lucide-react';
 
-
 import Home from './components/Home';
 import Dashboard from './components/Dashboard';
-import HelpCenter from './components/HelpCenter';
 import TitheCalculator from './components/TitheCalculator';
 import { Maintenance } from './components/Maintenance';
 import Disciples from './components/Disciples';
@@ -304,7 +302,7 @@ const App: React.FC = () => {
 
         if (needsUpdate || needsPermFix) {
           for (const u of users) {
-             if (u) await saveRecord('users', u);
+            if (u) await saveRecord('users', u);
           }
         }
 
@@ -466,7 +464,6 @@ const App: React.FC = () => {
                           <NavItem to="/feed" icon={BookOpen} label="Feed Palavras" permission="dashboard" />
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Configurações</div>
                           <NavItem to="/perfil" icon={UserCircle} label="Meu Perfil" permission="profile" />
-                          <NavItem to="/ajuda" icon={HelpCenter} label="Central de Ajuda" permission="dashboard" />
                           {user.permissions?.master && <NavItem to="/admin" icon={ShieldCheck} label="Master Admin" permission="master" />}
                         </nav>
 
@@ -502,7 +499,6 @@ const App: React.FC = () => {
                           <Route path="/cursos" element={<CoursesControl />} />
                           <Route path="/atas" element={<CellMeetings />} />
                           <Route path="/perfil" element={<ProfileSettings />} />
-                          <Route path="/ajuda" element={<HelpCenter />} />
                           {user.permissions?.master && <Route path="/admin" element={<AdminPanel />} />}
                           <Route path="*" element={<Navigate to="/" />} />
                         </Routes>
