@@ -75,6 +75,19 @@ const Disciples: React.FC = () => {
     return await loadLinhagem();
   });
 
+  // Global fetch for leaders (all pages) to populate selects
+  const { data: allLeadersData = [] } = useSWR('/api/leaders/global', async () => {
+    const { supabaseService } = await import('../services/supabaseService');
+    const data = await supabaseService.getLeaders();
+    return data;
+  }, { revalidateOnFocus: true });
+
+  const allLeaderNames = useMemo(() => {
+    return Array.from(new Set(allLeadersData.map((l: any) => l.nome)))
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.localeCompare(b));
+  }, [allLeadersData]);
+
   const { data: pendingRequests = [], mutate: mutatePending } = useSWR('/api/pendingRegistrations', async () => {
     try {
       const data = await loadData<any>('pendingRegistrations');
@@ -964,8 +977,8 @@ const Disciples: React.FC = () => {
 
                       <div className="grid grid-cols-2 gap-3">
                         <div className="grid grid-cols-2 gap-3">
-                          <SelectField label="Líder de 12" options={leaderNames} value={newDisciple.lider12} onChange={(v: any) => setNewDisciple({ ...newDisciple, lider12: v })} />
-                          <SelectField label="Líder Direta" options={leaderNames} value={newDisciple.liderDireta} onChange={(v: any) => setNewDisciple({ ...newDisciple, liderDireta: v })} />
+                          <SelectField label="Líder de 12" options={allLeaderNames} value={newDisciple.lider12} onChange={(v: any) => setNewDisciple({ ...newDisciple, lider12: v })} />
+                          <SelectField label="Líder Direta" options={allLeaderNames} value={newDisciple.liderDireta} onChange={(v: any) => setNewDisciple({ ...newDisciple, liderDireta: v })} />
                         </div>
                       </div>
                     </div>

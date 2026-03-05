@@ -130,6 +130,7 @@ export const supabaseService = {
 
         const { error } = await query;
 
+
         if (error) throw error;
     },
     // Specific for Disciples (Peregrinas)

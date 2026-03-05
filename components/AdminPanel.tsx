@@ -287,10 +287,10 @@ const AdminPanel: React.FC = () => {
                       const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
                       all.forEach((d: any) => {
-                        const n = normalize(d.nome);
-                        if (seen.has(n)) {
+                        const n = normalize(d.record?.nome || '');
+                        if (n && seen.has(n)) {
                           toDelete.push(d.id);
-                        } else {
+                        } else if (n) {
                           seen.add(n);
                         }
                       });
