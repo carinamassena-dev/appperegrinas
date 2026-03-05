@@ -71,7 +71,7 @@ const Login: React.FC = () => {
        // Limpa temporariamente pra testar a migração
        localStorage.clear();
     } else {
-       alert("O botão varreu as pastas do seu Chrome, mas não achou nenhuma discípula guardada off-line aqui. Fique atenta ao navegador correto!");
+       alert("O botão varreu as pastas do seu Chrome, mas não achou nenhuma discípula guardada off-line aqui.");
     }
   };
 
@@ -89,10 +89,9 @@ const Login: React.FC = () => {
       });
 
       if (!res.ok) {
-        const textError = await res.text(); // Lê como texto bruto primeiro
+        const textError = await res.text();
         console.error("ERRO BRUTO DA API:", textError);
 
-        // Tenta extrair mensagem amigável 
         try {
           const parsed = JSON.parse(textError);
           if (parsed.error) {
@@ -250,13 +249,12 @@ const Login: React.FC = () => {
                 Entrar no Sistema <ArrowRight size={16} />
               </button>
 
-              {/* NOSSO BOTÃO DE EMERGÊNCIA APARECE AQUI */}
               <button 
                   type="button" 
                   onClick={migrarParaNuvemMagicamente} 
                   className="w-full bg-lime-600 text-white shadow-lg py-4 rounded-xl font-bold uppercase text-[9px] mt-2 border-2 border-lime-700 hover:bg-lime-700 transition-all"
               >
-                  Recuperar Dados do Computador ➜ Nuvem
+                  Recuperar Dados do Computador
               </button>
 
               <button
@@ -375,4 +373,45 @@ const Login: React.FC = () => {
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                      Olá <span className="text-black">{targetUser?.
+                      Olá <span className="text-black">{targetUser?.nome}</span>, defina sua nova senha de acesso abaixo.
+                    </p>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                      <input
+                        type="password" placeholder="Nova Senha" required
+                        className="w-full pl-12 pr-4 py-5 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-lime-200"
+                        value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <button onClick={handleResetPassword} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs">
+                    REDEFINIR SENHA
+                  </button>
+                </div>
+              )}
+
+              {recoveryStep === 'success' && (
+                <div className="text-center space-y-6 py-6 animate-in zoom-in-95">
+                  <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle size={48} />
+                  </div>
+                  <h4 className="font-black text-xl uppercase tracking-tight">Tudo pronto!</h4>
+                  <p className="text-xs text-gray-400">Sua senha foi redefinida. Você já pode acessar o sistema com sua nova chave.</p>
+                  <button onClick={() => setRecoveryStep('none')} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs">
+                    VOLTAR AO LOGIN
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="text-center pt-8">
+          <p className="text-[9px] text-gray-300 font-black uppercase tracking-widest">© 2025 Peregrinas App • V3.0</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Login;
