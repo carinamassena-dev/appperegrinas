@@ -64,14 +64,44 @@ export async function loadData<T>(module: keyof typeof TABLES): Promise<T[]> {
     }
 
     const now = Date.now();
+
+    // 1. Check localStorage cache first (survives page refresh)
+    const lsKey = `cached_${module}`;
+    const cachedItemStr = localStorage.getItem(lsKey);
+    if (cachedItemStr) {
+        try {
+            const cachedItem = JSON.parse(cachedItemStr);
+            if (now - cachedItem.timestamp < CACHE_LIFETIME) {
+                console.log(`[Cache Hit] Poupando Egress de: ${module} (via localStorage)`);
+                memoryCache[module] = cachedItem;
+                return cachedItem.data as T[];
+            } else {
+                localStorage.removeItem(lsKey);
+            }
+        } catch (e) {
+            localStorage.removeItem(lsKey);
+        }
+    }
+
+    // 2. Check in-memory cache
     if (memoryCache[module] && (now - memoryCache[module].timestamp < CACHE_LIFETIME)) {
         console.log(`[Cache Hit] Poupando Egress de: ${module}`);
         return memoryCache[module].data as T[];
     }
 
+    // 3. Fetch from Supabase
     try {
         const data = await supabaseService.getAll(table);
-        memoryCache[module] = { data: data || [], timestamp: now };
+        const cacheObj = { data: data || [], timestamp: now };
+        memoryCache[module] = cacheObj;
+
+        // Save to localStorage for next browser session
+        try {
+            localStorage.setItem(lsKey, JSON.stringify(cacheObj));
+        } catch (e) {
+            console.warn(`[Cache] Falha ao salvar ${module} no localStorage (possível limite de quota)`, e);
+        }
+
         return (data || []) as T[];
     } catch (err: any) {
         const errorMsg = `${err?.message || err} - Code: ${err?.code || 'N/A'}`;
@@ -190,9 +220,10 @@ export async function saveRecord(module: keyof typeof TABLES, item: any): Promis
     try {
         await supabaseService.upsert(table, item);
         delete memoryCache[module];
+        localStorage.removeItem(`cached_${module}`);
         if (module === 'disciples') {
             delete memoryCache['disciplesList'];
-            localStorage.removeItem('cached_disciplesList'); // Clear cache to allow refresh on next call
+            localStorage.removeItem('cached_disciplesList');
         }
     } catch (err) {
         console.error(`[DataService] Erro ao salvar em ${module}:`, err);
@@ -231,6 +262,7 @@ export async function deleteRecord(module: keyof typeof TABLES, id: string): Pro
         await supabaseService.delete(table, id);
         delete memoryCache[module];
         delete memoryCache[`${module}List`];
+        localStorage.removeItem(`cached_${module}`);
     } catch (err) {
         console.error(`[DataService] Erro ao deletar de ${module}:`, err);
     }

@@ -110,24 +110,37 @@ const ForceHomeOnMount: React.FC = () => {
 };
 
 // Validate session directly with Supabase matching user ID
+// Cache to avoid re-querying on every route change
+let _sessionCache: { userId: string; valid: boolean; timestamp: number } | null = null;
+const SESSION_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 const validateSession = async (user: UserAccount | null) => {
   if (!user || !supabase) return false;
+
+  // Return cached result if still valid
+  const now = Date.now();
+  if (_sessionCache && _sessionCache.userId === user.id && (now - _sessionCache.timestamp < SESSION_CACHE_TTL)) {
+    return _sessionCache.valid;
+  }
+
   try {
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id, record')
-      .eq('id', user.id)
-      .single();
+      .select('id', { count: 'exact', head: true })
+      .eq('id', user.id);
 
     if (error || !data) {
       // MASTER BYPASS: Never auto-logout the master user even if table sync fails
       if (user.role === 'Master' || user.email === 'carina.massena@gmail.com') {
+        _sessionCache = { userId: user.id, valid: true, timestamp: now };
         return true;
       }
+      _sessionCache = { userId: user.id, valid: false, timestamp: now };
       return false;
     }
 
     // Optional: Cross-verify permission map
+    _sessionCache = { userId: user.id, valid: true, timestamp: now };
     return true;
   } catch {
     return false;
