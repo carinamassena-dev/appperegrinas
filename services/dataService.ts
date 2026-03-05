@@ -13,7 +13,7 @@ type TableMap = {
     table: string;
 };
 
-const TABLES: Record<string, TableMap> = {
+const TABLES: Record<string, { table: string; isRelational?: boolean; isGlobal?: boolean }> = {
     disciples: { table: 'peregrinas' },
     finance: { table: 'financeiro' },
     harvest: { table: 'colheita' },
@@ -27,7 +27,10 @@ const TABLES: Record<string, TableMap> = {
     auditLogs: { table: 'audit_logs' },
     pendingRegistrations: { table: 'pending_registrations' },
     intercessions: { table: 'intercessoes' },
-    attendance: { table: 'presencas' }
+    attendance: { table: 'presencas', isRelational: true },
+    forumPosts: { table: 'forum_posts' },
+    organizations: { table: 'organizations', isRelational: true, isGlobal: true },
+    amigoSecreto: { table: 'amigo_secreto', isRelational: true }
 };
 
 /**
@@ -281,10 +284,10 @@ export async function generateFullSystemBackup(): Promise<any> {
     const modules = Object.keys(TABLES) as (keyof typeof TABLES)[];
 
     for (const mod of modules) {
-        const { table } = TABLES[mod];
+        const { table, isRelational, isGlobal } = TABLES[mod];
         try {
             console.log(`[Backup] Baixando módulo: ${mod}`);
-            const data = await supabaseService.getFullTableBackup(table);
+            const data = await supabaseService.getFullTableBackup(table, isRelational, isGlobal);
             allData[mod] = data;
         } catch (err) {
             console.error(`[Backup] Erro ao baixar módulo ${mod}:`, err);
@@ -294,9 +297,51 @@ export async function generateFullSystemBackup(): Promise<any> {
 
     return {
         ...allData,
-        exportedAt: new Date().toISOString()
+        exportedAt: new Date().toISOString(),
+        version: '2.0'
     };
 }
+
+/**
+ * Restore system from a backup object
+ */
+export async function restoreFromBackup(backupData: any): Promise<{ success: boolean; errors: string[] }> {
+    if (!isSupabaseReady()) return { success: false, errors: ['Supabase não configurado.'] };
+
+    const errors: string[] = [];
+    const modules = Object.keys(TABLES) as (keyof typeof TABLES)[];
+
+    for (const mod of modules) {
+        const records = backupData[mod];
+        if (!records || !Array.isArray(records)) {
+            console.warn(`[Restore] Módulo ${mod} não encontrado no backup.`);
+            continue;
+        }
+
+        const { table, isRelational } = TABLES[mod];
+        console.log(`[Restore] Restaurando ${records.length} registros em: ${mod}`);
+
+        try {
+            // Restore one-by-one to ensure reliability and handle possible JSONB mapping
+            for (const record of records) {
+                if (isRelational) {
+                    await supabaseService.upsertRelational(table, record);
+                } else {
+                    await supabaseService.upsert(table, record);
+                }
+            }
+            // Clear cache for this module
+            delete memoryCache[mod];
+            localStorage.removeItem(`cached_${mod}`);
+        } catch (err: any) {
+            console.error(`[Restore] Erro no módulo ${mod}:`, err);
+            errors.push(`Erro em ${mod}: ${err.message || err}`);
+        }
+    }
+
+    return { success: errors.length === 0, errors };
+}
+
 
 // Check-ins: Save a batch of attendances to minimize Egress
 export async function saveAttendanceBatch(records: { id_discipula: string; id_lider: string; data_presenca: string }[]): Promise<void> {

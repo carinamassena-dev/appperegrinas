@@ -64,18 +64,46 @@ export const supabaseService = {
     },
 
     // Dedicated Backup Function (No Limits)
-    async getFullTableBackup(table: string) {
+    async getFullTableBackup(table: string, isRelational: boolean = false, isGlobal: boolean = false) {
         if (!supabase) return [];
         const orgId = getMyOrgId();
-        let query = supabase.from(table).select('id, record');
-        if (orgId) query = query.eq('organization_id', orgId);
+
+        // Select 'id, record' for NoSQL-style tables, '*' for Relational ones
+        let query = supabase.from(table).select(isRelational ? '*' : 'id, record');
+
+        // Only filter by org if not a global table
+        if (orgId && !isGlobal) query = query.eq('organization_id', orgId);
 
         const { data, error } = await query;
         if (error) {
             console.error(`[Supabase Backup Error] Table: ${table}`, error);
             throw error;
         }
-        return (data || []).map((row: any) => row.record);
+
+        // Return raw rows if relational, extract .record if NoSQL
+        return isRelational ? (data || []) : (data || []).map((row: any) => row.record);
+    },
+
+    // Upsert for Relational Tables (Direct columns)
+    async upsertRelational(table: string, item: any) {
+        if (!supabase) throw new Error("Supabase não configurado.");
+        const orgId = getMyOrgId();
+
+        const payload = { ...item };
+        if (orgId && !payload.organization_id && table !== 'organizations') {
+            payload.organization_id = orgId;
+        }
+
+        const { data, error } = await supabase
+            .from(table)
+            .upsert(payload, { onConflict: 'id' })
+            .select();
+
+        if (error) {
+            console.error(`[Supabase Relational Error] Table: ${table}`, error);
+            throw error;
+        }
+        return data;
     },
 
     // Get Count Header Only (Extreme Egress Saver)

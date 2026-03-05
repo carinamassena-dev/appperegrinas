@@ -5,13 +5,13 @@ import {
   Trash2, Plus, UserPlus, Edit2,
   RefreshCw, X, Terminal, Loader2,
   Activity, Sparkles, DatabaseZap, Link as LinkIcon,
-  DollarSign, Calendar, CheckCircle2, ArrowRight, Sprout
+  DollarSign, Calendar, CheckCircle2, ArrowRight, Sprout, Download, Upload, AlertTriangle
 } from 'lucide-react';
 import { UserAccount, BaptismStatus, CDLevel, TransactionType, Disciple, Leader, FinanceRecord, Harvest, Event as AppEvent } from '../types';
 import { AuthContext } from '../App';
 import { fetchSheetCSV, parseCSV, sendDataToSheet } from '../services/googleSheetsService';
 import { supabaseService } from '../services/supabaseService';
-import { loadData, saveRecord, deleteRecord, loadDisciplesList } from '../services/dataService';
+import { loadData, saveRecord, deleteRecord, loadDisciplesList, generateFullSystemBackup, restoreFromBackup } from '../services/dataService';
 import { refreshSupabaseClient } from '../services/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { getAuditLogs, getCachedAuditLogs, logAction, AuditLog, AuditLogType } from '../services/auditService';
@@ -261,8 +261,88 @@ const AdminPanel: React.FC = () => {
                   <p className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-2">
                     <CheckCircle2 size={14} /> Configurado via Vercel (Auto)
                   </p>
-                  <p className="text-[9px] text-green-600 mt-1">A URL e Key estão sendo carregadas das variáveis de ambiente automaticamente. Todos os dados são sincronizados em tempo real.</p>
+                  <p className="text-[9px] text-green-600 mt-1">A URL e Key estão sendo carregadas das variáveis de ambiente automaticamente.</p>
                 </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
+              <div>
+                <h3 className="text-xl font-black uppercase flex items-center gap-3 tracking-tighter">
+                  <Database size={24} /> Backup & Restauração
+                </h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Segurança dos Dados</p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    const backup = await generateFullSystemBackup();
+                    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `peregrinas_backup_${new Date().toISOString().split('T')[0]}.json`;
+                    a.click();
+                    addAuditLog("Backup Exportado", "Backup completo do sistema via JSON", "SISTEMA");
+                  }}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-lime-50 rounded-2xl border border-transparent hover:border-lime-200 transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Download size={20} className="text-gray-400 group-hover:text-lime-600" />
+                    <span className="text-xs font-black uppercase text-gray-900">Exportar JSON</span>
+                  </div>
+                  <ArrowRight size={16} className="text-gray-300 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".json"
+                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      if (!confirm("⚠️ ATENÇÃO: Restaurar um backup substituirá registros conflitantes. Deseja prosseguir?")) {
+                        e.target.value = '';
+                        return;
+                      }
+
+                      setIsSyncing(true);
+                      try {
+                        const content = await file.text();
+                        const backupData = JSON.parse(content);
+                        const result = await restoreFromBackup(backupData);
+
+                        if (result.success) {
+                          alert("✅ Restauração concluída com sucesso!");
+                          addAuditLog("Backup Restaurado", "Dados importados via arquivo JSON", "SISTEMA");
+                          window.location.reload();
+                        } else {
+                          alert("❌ Alguns erros ocorreram:\n" + result.errors.join('\n'));
+                        }
+                      } catch (err) {
+                        alert("❌ Falha crítica ao ler arquivo: " + err);
+                      } finally {
+                        setIsSyncing(false);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                  <button className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-blue-50 rounded-2xl border border-transparent hover:border-blue-200 transition-all group pointer-events-none">
+                    <div className="flex items-center gap-3">
+                      <Upload size={20} className="text-gray-400 group-hover:text-blue-600" />
+                      <span className="text-xs font-black uppercase text-gray-900">Importar Backup</span>
+                    </div>
+                    {isSyncing ? <Loader2 size={16} className="animate-spin text-blue-600" /> : <ArrowRight size={16} className="text-gray-300" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex gap-3">
+                <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                <p className="text-[9px] text-amber-700 font-medium">Use a importação apenas para recuperação de desastres ou migração. O processo é irreversível.</p>
               </div>
             </div>
           </div>
