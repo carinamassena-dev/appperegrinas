@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import {
   Users, Sprout, DollarSign, Calendar,
   Menu, X, Flower2, ShieldCheck,
-  Home as HomeIcon, Activity, LogOut, MapPin, Gift,
-  BarChart3, QrCode, BookOpen, GraduationCap, ClipboardList, UserCircle, MoreHorizontal, MessageSquarePlus, Mail, Calculator, MessageSquare
+  Home as HomeIcon, Activity, LogOut, MapPin, Gift, HelpCircle,
+  BarChart3, QrCode, BookOpen, GraduationCap, ClipboardList, UserCircle, MoreHorizontal, MessageSquarePlus, Mail, Calculator, MessageSquare, ShieldAlert
 } from 'lucide-react';
+
 
 import Home from './components/Home';
 import Dashboard from './components/Dashboard';
@@ -39,6 +41,7 @@ import { loadData, saveRecord } from './services/dataService';
 import { supabase } from './services/supabaseClient';
 import MuralComunhao from './components/MuralComunhao';
 import AgendaGeracao from './components/AgendaGeracao';
+import SuperAdminPanel from './components/SuperAdminPanel';
 
 export interface AuthContextType {
   user: UserAccount | null;
@@ -465,6 +468,9 @@ const App: React.FC = () => {
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Configurações</div>
                           <NavItem to="/perfil" icon={UserCircle} label="Meu Perfil" permission="profile" />
                           {user.permissions?.master && <NavItem to="/admin" icon={ShieldCheck} label="Master Admin" permission="master" />}
+                          {user.email === 'carina.massena@gmail.com' && (
+                            <NavItem to="/super-admin" icon={ShieldAlert} label="Super Admin" permission="dashboard" />
+                          )}
                         </nav>
 
                         <button onClick={logout} className="mt-8 flex items-center space-x-4 px-6 py-5 rounded-2xl text-red-500 font-black text-[11px] uppercase tracking-widest bg-red-50/50 hover:bg-red-50 transition-colors">
@@ -495,11 +501,12 @@ const App: React.FC = () => {
                           <Route path="/tickets" element={<Tickets />} />
                           <Route path="/feed" element={<Feed />} />
                           <Route path="/mural" element={<MuralComunhao userProfile={user} />} />
-                          <Route path="/agenda" element={<AgendaGeracao eventos={[]} onAddEvento={() => { }} userRole={user.role} />} />
+                          <Route path="/agenda" element={<AgendaGeracao userRole={user.role} />} />
                           <Route path="/cursos" element={<CoursesControl />} />
                           <Route path="/atas" element={<CellMeetings />} />
                           <Route path="/perfil" element={<ProfileSettings />} />
                           {user.permissions?.master && <Route path="/admin" element={<AdminPanel />} />}
+                          {user.email === 'carina.massena@gmail.com' && <Route path="/super-admin" element={<SuperAdminPanel />} />}
                           <Route path="*" element={<Navigate to="/" />} />
                         </Routes>
                       </div>

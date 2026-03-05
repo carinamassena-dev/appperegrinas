@@ -136,11 +136,14 @@ export const supabaseService = {
         return this.getAll('peregrinas');
     },
 
-    // Optimized List Fetcher
-    async getDisciplesList() {
+    // Optimized List Fetcher (Now with Pagination & Backend Search)
+    async getDisciplesList(page: number = 0, limit: number = 20, searchTerm: string = '') {
         if (!supabase) return [];
 
         const orgId = getMyOrgId();
+        const start = page * limit;
+        const end = start + limit - 1;
+
         let query = supabase
             .from('peregrinas')
             .select(`
@@ -167,15 +170,23 @@ export const supabaseService = {
                 celula1:record->celula1,
                 celula2:record->celula2,
                 fazMaisDeUmaCelula:record->fazMaisDeUmaCelula
-            `);
+            `)
+            .range(start, end)
+            .order('id', { ascending: false });
 
         if (orgId) query = query.eq('organization_id', orgId);
+        if (searchTerm && searchTerm.trim().length >= 3) {
+            query = query.ilike('record->>nome', `%${searchTerm.trim()}%`);
+        }
+
         const { data, error } = await query;
 
         if (error) {
             console.error('[Supabase Error] getDisciplesList fallback:', error);
-            // Fallback if specific json extraction fails
-            const { data: fallback, error: err2 } = await supabase.from('peregrinas').select('id, record');
+            // Fallback (Not applying pagination here because JSONb specific extracts failed)
+            let fallbackQuery = supabase.from('peregrinas').select('id, record').range(start, end);
+            if (orgId) fallbackQuery = fallbackQuery.eq('organization_id', orgId);
+            const { data: fallback, error: err2 } = await fallbackQuery;
             if (err2) throw err2;
             return (fallback || []).map((row: any) => row.record);
         }
@@ -414,6 +425,39 @@ export const supabaseService = {
             return [];
         }
         return data || [];
+    },
+
+    // --- SUPER ADMIN: Gestão de Tenants (Organizations) ---
+    async getOrganizations() {
+        if (!supabase) return [];
+        // Sem filtro de orgId, queremos ver todas as organizações
+        const { data, error } = await supabase.from('organizations').select('*').order('created_at', { ascending: false });
+        if (error) {
+            console.error('[Supabase Error] getOrganizations:', error);
+            return [];
+        }
+        return data || [];
+    },
+
+    async saveOrganization(org: any) {
+        if (!supabase) throw new Error("Supabase não configurado.");
+        const isUpdate = !!org.id;
+
+        const payload = isUpdate ? org : {
+            nome: org.nome,
+            slug: org.slug || org.nome.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+        };
+
+        let query = supabase.from('organizations');
+        if (isUpdate) {
+            query = query.update(payload).eq('id', org.id) as any;
+        } else {
+            query = query.insert([payload]) as any;
+        }
+
+        const { data, error } = await query.select().single();
+        if (error) throw error;
+        return data;
     }
 }
 

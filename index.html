@@ -27,6 +27,21 @@
         
         .leaflet-popup-content-wrapper { border-radius: 1.5rem; padding: 0; overflow: hidden; }
         .leaflet-popup-content { margin: 0; line-height: inherit; }
+
+        /* S20 FE & Mobile Global Fixes */
+        html, body, #root {
+            max-width: 100vw;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+
+        @media (max-width: 600px) {
+            /* Evitar imagens vazando o fluxo */
+            img { max-width: 100%; height: auto; }
+            
+            /* Add extra padding nas extremidades em grids pesadas */
+            .fixed-mobile-padding { padding-left: 16px !important; padding-right: 16px !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 overflow-x-hidden">

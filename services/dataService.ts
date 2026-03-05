@@ -83,7 +83,7 @@ export async function loadData<T>(module: keyof typeof TABLES): Promise<T[]> {
 /**
  * Optimized Fetch specifically for Disciples List (avoids downloading Base64 images)
  */
-export async function loadDisciplesList(): Promise<any[]> {
+export async function loadDisciplesList(page: number = 0, limit: number = 20, searchTerm: string = ''): Promise<any[]> {
     if (!isSupabaseReady()) return [];
 
     const now = Date.now();
@@ -113,7 +113,7 @@ export async function loadDisciplesList(): Promise<any[]> {
 
     try {
         console.log('[Data Fetch] Carregando lista de discípulos do banco...');
-        const data = await supabaseService.getDisciplesList();
+        const data = await supabaseService.getDisciplesList(page, limit, searchTerm);
         const cacheObj = { data: data || [], timestamp: now };
         memoryCache['disciplesList'] = cacheObj;
 

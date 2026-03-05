@@ -45,9 +45,21 @@ const Disciples: React.FC = () => {
 
   const [showPendingModal, setShowPendingModal] = useState(false);
 
-  const { data: disciples = [], isLoading, mutate } = useSWR('/api/disciples', async () => {
+  // Pagination & Server Search
+  const [page, setPage] = useState(0);
+  const [serverSearchTerm, setServerSearchTerm] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setServerSearchTerm(searchTerm);
+      setPage(0); // Reset page on new search
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  const { data: disciples = [], isLoading, mutate } = useSWR(['/api/disciples', page, serverSearchTerm], async () => {
     console.time('fetch-cadastros');
-    const data = await loadDisciplesList();
+    const data = await loadDisciplesList(page, 20, serverSearchTerm);
     console.timeEnd('fetch-cadastros');
     return data as Disciple[];
   }, { revalidateOnFocus: true });
@@ -204,17 +216,8 @@ const Disciples: React.FC = () => {
   };
 
   const filtered = useMemo(() => {
-    return disciples.filter(d => {
-      const matchesSearch =
-        d.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (d.bairro && d.bairro.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (d.cidade && d.cidade.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      const matchesStatus = filterStatus === 'all' || d.status === filterStatus;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [disciples, searchTerm, filterStatus]);
+    return disciples.filter(d => filterStatus === 'all' || d.status === filterStatus);
+  }, [disciples, filterStatus]);
 
   const groupedByLeader = useMemo(() => {
     const groups: { [key: string]: Disciple[] } = {};
@@ -484,41 +487,58 @@ const Disciples: React.FC = () => {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (user?.role !== 'Master') {
       return alert("Esse download só é permitido para o usuário master.");
     }
-    const data = filtered.map(d => ({
-      'Nome': d.nome,
-      'WhatsApp': d.whatsapp,
-      'Aniversário': d.dataAniversario,
-      'Idade': d.idade,
-      'Status': d.status,
-      'Bairro': d.bairro,
-      'Cidade': d.cidade,
-      'Líder de 12': d.lider12,
-      'Líder Direta': d.liderDireta,
-      'Ministério': d.ministerio
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Peregrinas");
-    XLSX.writeFile(workbook, `peregrinas_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+    try {
+      // Re-fetch everything for export to bypass pagination limits
+      const { supabaseService } = await import('../services/supabaseService');
+      const allData = await supabaseService.getAll('peregrinas');
+
+      const data = allData.map(d => ({
+        'Nome': d.nome || '',
+        'WhatsApp': d.whatsapp || '',
+        'Aniversário': d.dataAniversario || '',
+        'Idade': d.idade || '',
+        'Status': d.status || '',
+        'Bairro': d.bairro || '',
+        'Cidade': d.cidade || '',
+        'Líder de 12': d.lider12 || '',
+        'Líder Direta': d.liderDireta || '',
+        'Ministério': d.ministerio || ''
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Peregrinas");
+      XLSX.writeFile(workbook, `peregrinas_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao buscar dados completos para exportação.");
+    }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (user?.role !== 'Master') {
       return alert("Esse download só é permitido para o usuário master.");
     }
-    const doc = new jsPDF();
-    doc.text("Relatório de Peregrinas", 14, 15);
-    const tableData = filtered.map(d => [d.nome, d.whatsapp, d.status, d.liderDireta, d.bairro]);
-    (doc as any).autoTable({
-      head: [['Nome', 'WhatsApp', 'Status', 'Líder Direta', 'Bairro']],
-      body: tableData,
-      startY: 20,
-    });
-    doc.save(`peregrinas_relatorio_${new Date().toISOString().split('T')[0]}.pdf`);
+    try {
+      const { supabaseService } = await import('../services/supabaseService');
+      const allData = await supabaseService.getAll('peregrinas');
+
+      const doc = new jsPDF();
+      doc.text("Relatório de Peregrinas", 14, 15);
+      const tableData = allData.map(d => [d.nome || '', d.whatsapp || '', d.status || '', d.liderDireta || '', d.bairro || '']);
+      (doc as any).autoTable({
+        head: [['Nome', 'WhatsApp', 'Status', 'Líder Direta', 'Bairro']],
+        body: tableData,
+        startY: 20,
+      });
+      doc.save(`peregrinas_relatorio_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao gerar PDF.");
+    }
   };
 
   return (
@@ -680,6 +700,25 @@ const Disciples: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Paginação */}
+          <div className="flex items-center justify-between px-4 py-4 mt-4 bg-gray-50 rounded-2xl border">
+            <button
+              disabled={page === 0}
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              className="px-4 py-2 bg-white text-black text-xs font-black uppercase tracking-widest rounded-xl disabled:opacity-50 transition-all shadow-sm"
+            >
+              Anterior
+            </button>
+            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Página {page + 1}</span>
+            <button
+              disabled={filtered.length < 20}
+              onClick={() => setPage(p => p + 1)}
+              className="px-4 py-2 bg-black text-white text-xs font-black uppercase tracking-widest rounded-xl disabled:opacity-50 transition-all shadow-md"
+            >
+              Próximo
+            </button>
+          </div>
         </div>
       ) : viewMode === 'folder' ? (
         <div className="space-y-4 px-1 text-left">
@@ -767,6 +806,25 @@ const Disciples: React.FC = () => {
               </div>
             );
           })}
+
+          {/* Paginação */}
+          <div className="flex items-center justify-between px-4 py-4 mt-4 bg-gray-50 rounded-2xl border">
+            <button
+              disabled={page === 0}
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              className="px-4 py-2 bg-white text-black text-xs font-black uppercase tracking-widest rounded-xl disabled:opacity-50 transition-all shadow-sm"
+            >
+              Anterior
+            </button>
+            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Página {page + 1}</span>
+            <button
+              disabled={filtered.length < 20}
+              onClick={() => setPage(p => p + 1)}
+              className="px-4 py-2 bg-black text-white text-xs font-black uppercase tracking-widest rounded-xl disabled:opacity-50 transition-all shadow-md"
+            >
+              Próximo
+            </button>
+          </div>
         </div>
       ) : (
         <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border shadow-sm mx-1 animate-in fade-in slide-in-from-bottom-2">

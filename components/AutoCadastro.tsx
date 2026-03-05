@@ -11,6 +11,7 @@ const AutoCadastro: React.FC = () => {
   const navigate = useNavigate();
   const tipo = searchParams.get('tipo'); // 'novo' ou 'atualizacao'
   const liderIdParam = searchParams.get('liderId');
+  const orgIdParam = searchParams.get('orgId'); // Usado por convites raiz do Super Admin
   const [isValid, setIsValid] = useState<boolean | null>(true); // Assumimos válido a menos que falte params críticos
   const [submitted, setSubmitted] = useState(false);
   const [liderName, setLiderName] = useState<string>('');
@@ -33,6 +34,13 @@ const AutoCadastro: React.FC = () => {
     }
 
     setFormData(prev => ({ ...prev, liderDireta: liderIdParam }));
+
+    // Se tiver orgId direto na URL (convite Super Admin), usa ele.
+    if (orgIdParam) {
+      setOrgId(orgIdParam);
+      setLiderName('Sistema Raiz (Primeira Líder)');
+      return;
+    }
 
     // Fetch leader name for the success message
     const fetchLeader = async () => {

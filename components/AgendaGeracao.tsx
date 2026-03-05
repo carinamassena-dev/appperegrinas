@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import {
     format,
@@ -17,22 +17,76 @@ export interface AgendaEvento {
     id: string;
     titulo: string;
     data: string; // ISO date string
+    categoria?: string;
+    status?: string;
+    tipo?: string;
 }
 
 interface AgendaGeracaoProps {
-    eventos: AgendaEvento[];
-    onAddEvento: (dia: Date) => void;
-    onDeleteEvento?: (id: string) => void;
     userRole: 'Master' | 'Líder' | 'Operador';
 }
 
-const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({
-    eventos,
-    onAddEvento,
-    onDeleteEvento,
-    userRole,
-}) => {
+const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
     const [mesAtual, setMesAtual] = useState(new Date());
+    const [eventos, setEventos] = useState<AgendaEvento[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchEventos = async () => {
+            const { loadData } = await import('../services/dataService');
+            try {
+                // A Agenda lê da mesma tabela 'events' do Events.tsx
+                const evs = await loadData<any>('events');
+                setEventos(evs.map(e => ({
+                    id: e.id,
+                    titulo: e.nome,
+                    data: e.dataInicio,
+                    categoria: e.categoria,
+                    status: e.status,
+                    tipo: e.tipo
+                })));
+            } catch (err) {
+                console.error("Erro ao carregar eventos da agenda", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchEventos();
+    }, []);
+
+    const onAddEvento = async (dia: Date) => {
+        const titulo = prompt("Digite o nome/título para o novo evento neste dia:");
+        if (!titulo || !titulo.trim()) return;
+
+        const { saveRecord } = await import('../services/dataService');
+
+        const novoId = `EVT_${Date.now()}`;
+        const dataIso = format(dia, 'yyyy-MM-dd');
+
+        const fullEventStruct = {
+            id: novoId,
+            nome: titulo,
+            descricao: 'Evento criado rapidamente pela Agenda',
+            categoria: 'Outros',
+            dataInicio: dataIso,
+            dataTermino: dataIso,
+            horario: '19:00',
+            local: 'Sede / A Definir',
+            tipo: 'Presencial',
+            valorPadrao: 0,
+            capacidadeMax: 100,
+            status: 'Ativo',
+            participantes: []
+        };
+
+        try {
+            await saveRecord('events', fullEventStruct);
+            setEventos(prev => [...prev, { id: fullEventStruct.id, titulo: fullEventStruct.nome, data: fullEventStruct.dataInicio }]);
+        } catch (e) {
+            console.error("Erro", e);
+            alert("Erro ao salvar Evento na Agenda.");
+        }
+    };
 
     // Lógica de Auto-Limpeza: Filtra eventos com mais de 5 dias de atraso (Segurança de Egress)
     const eventosFiltrados = useMemo(() => {
@@ -82,8 +136,8 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({
                         <div
                             key={dia.toString()}
                             className={`min-h-[80px] p-1 rounded-xl border transition-all ${ehHoje
-                                    ? 'bg-lime-50 border-lime-300 shadow-inner'
-                                    : 'bg-white border-gray-100'
+                                ? 'bg-lime-50 border-lime-300 shadow-inner'
+                                : 'bg-white border-gray-100'
                                 }`}
                         >
                             <span
