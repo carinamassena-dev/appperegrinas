@@ -1,4 +1,3 @@
-
 // uiConfigService.ts — Gerenciamento da configuração visual do app (Master only)
 // Uses Supabase via dataService for persistence.
 // Falls back to defaults if Supabase hasn't loaded yet.
@@ -136,7 +135,7 @@ export function getConfig(): UIConfig {
 export async function loadConfigFromSupabase(): Promise<UIConfig> {
     try {
         const configs = await loadData<any>('settings');
-        const found = configs.find((c: any) => c.id === 'app_ui_config');
+        const found = (configs || []).find((c: any) => c?.id === 'app_ui_config');
         if (found) {
             const parsed: UIConfig = found.data || found;
             // Merge: fill in any missing screen keys from defaults
