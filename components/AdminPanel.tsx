@@ -162,9 +162,9 @@ const AdminPanel: React.FC = () => {
           <button onClick={() => setActiveTab('users')} className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-black text-white shadow-lg' : 'text-gray-400'}`}>Acessos</button>
           <button onClick={() => setActiveTab('requests')} className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative ${activeTab === 'requests' ? 'bg-black text-white shadow-lg' : 'text-gray-400'}`}>
             Solicitações
-            {users.filter(u => u.status === 'pending').length > 0 && (
+            {users.filter(u => u?.status === 'pending').length > 0 && (
               <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
-                {users.filter(u => u.status === 'pending').length}
+                {users.filter(u => u?.status === 'pending').length}
               </span>
             )}
           </button>
@@ -261,7 +261,7 @@ const AdminPanel: React.FC = () => {
                   <p className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-2">
                     <CheckCircle2 size={14} /> Configurado via Vercel (Auto)
                   </p>
-                  <p className="text-[9px] text-green-600 mt-1">A URL e Key estão sendo carregadas das variáveis de ambiente automaticamente. Todos os dados são sincronizados em tempo real.</p>
+                  <p className="text-[9px] text-green-600 mt-1">A URL e Key estão sendo carregadas das variáveis de ambiente automatically. Todos os dados são sincronizados em tempo real.</p>
                 </div>
               </div>
             </div>
@@ -303,17 +303,17 @@ const AdminPanel: React.FC = () => {
           </button>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {users.filter(u => u.status !== 'pending').map(u => (
+            {users.filter(u => u?.status !== 'pending').map(u => (
               <div key={u.id} className="bg-white p-6 rounded-[2rem] border shadow-sm flex flex-col gap-6 group hover:border-lime-300 transition-colors">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center font-black text-gray-400 text-xl border-2 border-dashed">{u.nome?.charAt(0) || u.username?.charAt(0) || '?'}</div>
+                    <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center font-black text-gray-400 text-xl border-2 border-dashed">{u?.nome?.charAt(0) || u?.username?.charAt(0) || '?'}</div>
                     <div className="min-w-0">
-                      <h3 className="font-black uppercase text-sm text-gray-900 truncate">{u.nome || 'Sem Nome'}</h3>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">@{u.username || 'unknown'}</p>
+                      <h3 className="font-black uppercase text-sm text-gray-900 truncate">{u?.nome || 'Sem Nome'}</h3>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">@{u?.username || 'unknown'}</p>
                     </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-tighter ${u.role === 'Master' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
+                  <span className={`px-3 py-1 rounded-lg font-black text-[9px] uppercase tracking-tighter ${u?.role === 'Master' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}>{u?.role}</span>
                 </div>
 
                 <div className="flex gap-2 mt-auto">
@@ -429,16 +429,16 @@ const AdminPanel: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {users.filter(u => u.status === 'pending').map(u => (
+              {users.filter(u => u?.status === 'pending').map(u => (
                 <div key={u.id} className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 flex flex-col gap-6">
                   <div>
-                    <h3 className="font-black uppercase text-sm text-gray-900">{u.nome || 'Sem Nome'}</h3>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Username: @{u.username}</p>
+                    <h3 className="font-black uppercase text-sm text-gray-900">{u?.nome || 'Sem Nome'}</h3>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Username: @{u?.username}</p>
 
                     <div className="mt-4 space-y-1">
-                      {u.whatsapp && <p className="text-xs text-gray-500 font-medium">📱 {u.whatsapp}</p>}
-                      {u.email && <p className="text-xs text-gray-500 font-medium">📧 {u.email}</p>}
-                      {u.requestedAt && <p className="text-[9px] text-gray-400 font-bold uppercase mt-2">Solicitado em: {new Date(u.requestedAt).toLocaleString('pt-BR')}</p>}
+                      {u?.whatsapp && <p className="text-xs text-gray-500 font-medium">📱 {u.whatsapp}</p>}
+                      {u?.email && <p className="text-xs text-gray-500 font-medium">📧 {u.email}</p>}
+                      {u?.requestedAt && <p className="text-[9px] text-gray-400 font-bold uppercase mt-2">Solicitado em: {new Date(u.requestedAt).toLocaleString('pt-BR')}</p>}
                     </div>
                   </div>
 
@@ -452,7 +452,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                 </div>
               ))}
-              {users.filter(u => u.status === 'pending').length === 0 && (
+              {users.filter(u => u?.status === 'pending').length === 0 && (
                 <div className="col-span-full py-12 text-center border-2 border-dashed border-gray-100 rounded-3xl">
                   <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Nenhuma solicitação pendente.</p>
                 </div>
