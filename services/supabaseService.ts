@@ -1,5 +1,16 @@
 import { supabase } from './supabaseClient';
 
+const getMyOrgId = () => {
+    try {
+        const u = localStorage.getItem('current_user');
+        if (u) {
+            const parsed = JSON.parse(u);
+            return parsed.organization_id || null;
+        }
+    } catch { }
+    return null;
+};
+
 export const supabaseService = {
     // Generic Upsert (NoSQL style with JSONB)
     async upsert(table: string, item: any) {
@@ -8,9 +19,15 @@ export const supabaseService = {
             throw new Error("Supabase não configurado.");
         }
 
+        const orgId = getMyOrgId();
+        if (orgId && !item.organization_id) {
+            item.organization_id = orgId;
+        }
+
         const payload = {
             id: item.id,
-            record: item
+            record: item,
+            ...(orgId ? { organization_id: orgId } : {})
         };
 
         const { data: result, error } = await supabase
@@ -31,10 +48,12 @@ export const supabaseService = {
 
         // Fetches directly without attempting to order by a non-existent native column.
         // The sorting of JSONB records is handled by the React components.
-        const { data, error } = await supabase
-            .from(table)
-            .select('id, record')
-            .order('id', { ascending: true });
+        // The sorting of JSONB records is handled by the React components.
+        const orgId = getMyOrgId();
+        let query = supabase.from(table).select('id, record').order('id', { ascending: true });
+        if (orgId) query = query.eq('organization_id', orgId);
+
+        const { data, error } = await query;
 
         if (error) {
             console.error(`[Supabase Error] Table: ${table}`, error);
@@ -47,7 +66,11 @@ export const supabaseService = {
     // Dedicated Backup Function (No Limits)
     async getFullTableBackup(table: string) {
         if (!supabase) return [];
-        const { data, error } = await supabase.from(table).select('id, record');
+        const orgId = getMyOrgId();
+        let query = supabase.from(table).select('id, record');
+        if (orgId) query = query.eq('organization_id', orgId);
+
+        const { data, error } = await query;
         if (error) {
             console.error(`[Supabase Backup Error] Table: ${table}`, error);
             throw error;
@@ -58,10 +81,11 @@ export const supabaseService = {
     // Generic Delete
     async delete(table: string, id: string) {
         if (!supabase) throw new Error("Supabase não configurado.");
-        const { error } = await supabase
-            .from(table)
-            .delete()
-            .eq('id', id);
+        const orgId = getMyOrgId();
+        let query = supabase.from(table).delete().eq('id', id);
+        if (orgId) query = query.eq('organization_id', orgId);
+
+        const { error } = await query;
 
         if (error) throw error;
     },
@@ -101,8 +125,8 @@ export const supabaseService = {
     async getDisciplesList() {
         if (!supabase) return [];
 
-        // Select specific jsonb keys to avoid downloading heavy Base64 images/certificates
-        const { data, error } = await supabase
+        const orgId = getMyOrgId();
+        let query = supabase
             .from('peregrinas')
             .select(`
                 id,
@@ -127,6 +151,9 @@ export const supabaseService = {
                 fazMaisDeUmaCelula:record->fazMaisDeUmaCelula
             `);
 
+        if (orgId) query = query.eq('organization_id', orgId);
+        const { data, error } = await query;
+
         if (error) {
             console.error('[Supabase Error] getDisciplesList fallback:', error);
             // Fallback if specific json extraction fails
@@ -142,16 +169,18 @@ export const supabaseService = {
     // Optimized Search for modal / selects (3 letters minimum)
     async searchDisciplesByName(term: string) {
         if (!supabase || term.trim().length < 3) return [];
-        const { data, error } = await supabase
+        const orgId = getMyOrgId();
+        let query = supabase
             .from('peregrinas')
             .select(`
                 id,
                 nome:record->>nome,
                 whatsapp:record->>whatsapp,
                 liderDireta:record->>liderDireta
-            `)
-            .ilike('record->>nome', `%${term}%`)
-            .limit(20);
+            `);
+
+        if (orgId) query = query.eq('organization_id', orgId);
+        const { data, error } = await query.ilike('record->>nome', `%${term}%`).limit(20);
 
         if (error) {
             console.error('[Supabase Error] searchDisciplesByName:', error);
@@ -168,16 +197,18 @@ export const supabaseService = {
         const day = String(today.getDate()).padStart(2, '0');
         const searchStr = `-${month}-${day}`; // Matches YYYY-MM-DD ending in -MM-DD
 
-        const { data, error } = await supabase
+        const orgId = getMyOrgId();
+        let query = supabase
             .from('peregrinas')
             .select(`
                 id,
                 nome:record->>nome,
                 dataAniversario:record->>dataAniversario,
                 liderDireta:record->>liderDireta
-            `)
-            .like('record->>dataAniversario', `%${searchStr}%`)
-            .limit(50);
+            `);
+
+        if (orgId) query = query.eq('organization_id', orgId);
+        const { data, error } = await query.like('record->>dataAniversario', `%${searchStr}%`).limit(50);
 
         if (error) {
             console.error('[Supabase Error] getTodayBirthdays:', error);
@@ -193,12 +224,13 @@ export const supabaseService = {
         // As data is JSONB and names can have accents, we query directly.
         // If normalization is strict, might need fetching active ones and filtering in TS, 
         // but lets try a direct match first.
-        const { data, error } = await supabase
+        const orgId = getMyOrgId();
+        let query = supabase
             .from('peregrinas')
-            .select('id, record')
-            .ilike('record->>nome', name)
-            .limit(1)
-            .single();
+            .select('id, record');
+
+        if (orgId) query = query.eq('organization_id', orgId);
+        const { data, error } = await query.ilike('record->>nome', name).limit(1).single();
 
         if (error || !data) return null;
         return data.record;
@@ -224,11 +256,13 @@ export const supabaseService = {
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
 
-        const { data, error } = await supabase
+        const orgId = getMyOrgId();
+        let query = supabase
             .from('intercessoes')
-            .select('id, record, created_at')
-            .gte('created_at', startOfDay.toISOString())
-            .order('created_at', { ascending: false });
+            .select('id, record, created_at');
+
+        if (orgId) query = query.eq('organization_id', orgId);
+        const { data, error } = await query.gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false });
 
         if (error) {
             console.error('[Supabase Error] getRecentIntercessions:', error);

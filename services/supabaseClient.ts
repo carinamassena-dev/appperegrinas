@@ -6,13 +6,24 @@ import { createClient } from '@supabase/supabase-js';
  */
 const getSupabaseConfig = () => {
     // @ts-ignore
-    const url = import.meta.env.VITE_SUPABASE_URL;
+    const url = import.meta.env.VITE_SUPABASE_URL || 'https://ofrwgukuoqbftdyzbfza.supabase.co';
     // @ts-ignore
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mcndndWt1b3FiZnRkeXpiZnphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MDM2NjksImV4cCI6MjA4ODE3OTY2OX0.igAsGDZA1QbZfPQW7i4V9jNBvu02Mds3Cs7-pLQ26MI';
     return { url, key };
 };
 
 const config = getSupabaseConfig();
+
+const getMyOrgId = () => {
+    try {
+        const u = localStorage.getItem('current_user');
+        if (u) {
+            const parsed = JSON.parse(u);
+            return parsed.organization_id || null;
+        }
+    } catch { }
+    return null;
+};
 
 export let supabase = (config.url && config.key)
     ? createClient(config.url, config.key)
@@ -53,6 +64,11 @@ export const safeQuery = async <T = unknown>(
         .order('created_at', { ascending: false })
         .limit(queryConfig.limit ?? 50); // Nunca carrega tudo de uma vez
 
+    const orgId = getMyOrgId();
+    if (orgId) {
+        query = query.eq('organization_id', orgId);
+    }
+
     if (queryConfig.filters) {
         for (const [col, val] of Object.entries(queryConfig.filters)) {
             query = query.eq(col, val);
@@ -62,4 +78,3 @@ export const safeQuery = async <T = unknown>(
     const { data, error } = await query;
     return { data: data as T[] | null, error };
 };
-

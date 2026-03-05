@@ -14,6 +14,7 @@ const AutoCadastro: React.FC = () => {
   const [isValid, setIsValid] = useState<boolean | null>(true); // Assumimos válido a menos que falte params críticos
   const [submitted, setSubmitted] = useState(false);
   const [liderName, setLiderName] = useState<string>('');
+  const [orgId, setOrgId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<Disciple> & { passwordHash?: string }>({
     nome: '', email: '', whatsapp: '', dataAniversario: '', statusRelacionamento: 'Solteira',
@@ -40,11 +41,15 @@ const AutoCadastro: React.FC = () => {
         const lider = leaders.find(l => l.id === liderIdParam);
         if (lider) {
           setLiderName(lider.nome);
+          if (lider.organization_id) setOrgId(lider.organization_id);
         } else {
           // Fallback to searching all users just in case
           const users = await loadData<any>('users');
           const user = users.find((u: any) => u.id === liderIdParam);
-          if (user) setLiderName(user.nome);
+          if (user) {
+            setLiderName(user.nome);
+            if (user.organization_id) setOrgId(user.organization_id);
+          }
         }
       } catch (e) {
         console.error("Erro ao buscar líder", e);
@@ -122,9 +127,9 @@ const AutoCadastro: React.FC = () => {
         batizada: formData.batizada || BaptismStatus.NAO_BATIZADA,
         fezUV: formData.fezUV || false,
         fezEncontro: formData.fezEncontro || false,
-        cdStatus: formData.cdStatus || 'Não Iniciou',
         fezFormatura: formData.fezFormatura || false,
-        fezReencontro: formData.fezReencontro || false
+        fezReencontro: formData.fezReencontro || false,
+        organization_id: orgId || undefined
       };
 
       await saveRecord('pendingRegistrations', pendingRecord);

@@ -41,6 +41,7 @@ export interface UserAccount {
   sessionToken?: string;
   status?: 'active' | 'pending';
   requestedAt?: string;
+  organization_id?: string;
 }
 
 export interface AppSettings {
@@ -92,6 +93,7 @@ export interface Event {
   tipo: string;
   valorPadrao: number;
   observacoes?: string;
+  organization_id?: string;
 }
 
 export interface CellInfo {
@@ -167,6 +169,7 @@ export interface Disciple {
   fazMaisDeUmaCelula?: boolean;
   celula1?: CellInfo;
   celula2?: CellInfo;
+  organization_id?: string;
 }
 
 export interface Leader extends Disciple {
@@ -206,6 +209,7 @@ export interface FeedItem {
   data: string;
   documento?: string; // Base64
   documentoNome?: string;
+  organization_id?: string;
 }
 
 export interface CellMeetingReport {

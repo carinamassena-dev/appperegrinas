@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useContext } from 'react';
 import {
   Users, ShieldCheck, Database, Save,
@@ -102,7 +103,8 @@ const AdminPanel: React.FC = () => {
         ...userData,
         id: `USR_${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
         passwordHash: userData.passwordHash || '123456',
-        status: 'active'
+        status: 'active',
+        organization_id: currentUser?.organization_id
       } as UserAccount;
       updatedUsers = [changedUser, ...users];
       addAuditLog("Usuário Criado", `Novo usuário @${userData.username} adicionado`, "USUARIO");
