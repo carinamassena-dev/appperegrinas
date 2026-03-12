@@ -24,11 +24,20 @@ export const supabaseService = {
             item.organization_id = orgId;
         }
 
-        const payload = {
+        const payload: any = {
             id: item.id,
             record: item,
             ...(orgId ? { organization_id: orgId } : {})
         };
+
+        // If table is 'usuarios', we MUST populate native columns to satisfy NOT NULL constraints
+        if (table === 'usuarios' || table === 'lideres') {
+            payload.nome = item.nome || item.name;
+            payload.username = item.username;
+            payload.email = item.email;
+            payload.role = item.role;
+            payload.status = item.status === 'active' ? 'Ativo' : (item.status || 'Ativo');
+        }
 
         const { data: result, error } = await supabase
             .from(table)

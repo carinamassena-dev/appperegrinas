@@ -1,3 +1,4 @@
+
 import React, { useState, useContext } from 'react';
 import { Flower2, Lock, User, ArrowRight, AlertCircle, X, CheckCircle, Smartphone, Mail, Loader2 } from 'lucide-react';
 import { AuthContext, AuthContextType } from '../App';
@@ -26,62 +27,6 @@ const Login: React.FC = () => {
     nome: '', email: '', whatsapp: '', username: '', passwordHash: ''
   });
 
-   // ==========================================================
-  // FUNÇÃO MÁGICA: RESGATAR DADOS DO CHROME PARA A NUVEM
-  // ==========================================================
-  const migrarParaNuvemMagicamente = async () => {
-    // Esconde o erro do Vercel com ts-ignore
-    // @ts-ignore
-    const supUrl = import.meta.env.VITE_SUPABASE_URL;
-    // @ts-ignore
-    const supKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    const supabaseUrl = supUrl || 'https://ofrwgukuoqbftdyzbfza.supabase.co'; 
-    const supabaseKey = supKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mcndndWt1b3FiZnRkeXpiZnphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MDM2NjksImV4cCI6MjA4ODE3OTY2OX0.igAsGDZA1QbZfPQW7i4V9jNBvu02Mds3Cs7-pLQ26MI';
-
-    const tabelas = ['peregrinas', 'financeiro', 'atas', 'eventos', 'colheita', 'feed', 'tickets', 'usuarios', 'lideres'];
-    let migrados = 0;
-    
-    for (const tabela of tabelas) {
-      const dados = localStorage.getItem(tabela);
-      if (dados) {
-        try {
-          const parsed = JSON.parse(dados);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            
-            // Corrige o formato se não tiver field id
-            const payload = parsed.map((item: any) => ({
-              id: item.id || crypto.randomUUID(),
-              record: item
-            }));
-
-            await fetch(`${supabaseUrl}/rest/v1/${tabela}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': supabaseKey,
-                'Authorization': `Bearer ${supabaseKey}`,
-                'Prefer': 'resolution=merge-duplicates'
-              },
-              body: JSON.stringify(payload)
-            });
-            migrados += parsed.length;
-          }
-        } catch (e) { console.error(`Erro na tabela ${tabela}`, e); }
-      }
-    }
-    
-    if (migrados > 0) {
-       alert(`SUCESSO SUPREMO! ${migrados} cadastros foram resgatados do seu computador preenchendo as tabelas da nuvem Supabase.\nAtualize a página e pronto!`);
-       // Limpa temporariamente pra testar a migração
-       localStorage.clear();
-    } else {
-       alert("O botão varreu as pastas do seu Chrome, mas não achou nenhuma discípula guardada off-line aqui.");
-    }
-  };
-
-
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -95,9 +40,10 @@ const Login: React.FC = () => {
       });
 
       if (!res.ok) {
-        const textError = await res.text();
+        const textError = await res.text(); // Lê como texto bruto primeiro
         console.error("ERRO BRUTO DA API:", textError);
 
+        // Tenta extrair mensagem amigável se de fato for um JSON formatado por nós (Ex: 401 Senha incorreta)
         try {
           const parsed = JSON.parse(textError);
           if (parsed.error) {
@@ -114,6 +60,7 @@ const Login: React.FC = () => {
       const data = await res.json();
 
       if (data && data.user) {
+        // Se houver token na resposta, garante que o usuário tenha ele
         if (data.sessionToken && !data.user.sessionToken) {
           data.user.sessionToken = data.sessionToken;
         }
@@ -135,6 +82,7 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // Load users from Supabase
       const users: UserAccount[] = await loadData<UserAccount>('users');
       const found = users.find(u => u.email === recoveryEmail || u.username === recoveryEmail);
 
@@ -187,7 +135,7 @@ const Login: React.FC = () => {
       }
 
       const newUser: UserAccount = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         ...requestData,
         role: 'Líder',
         permissions: {
@@ -202,9 +150,9 @@ const Login: React.FC = () => {
       alert("Solicitação enviada com sucesso! Aguarde a liberação da liderança.");
       setIsRequestingAccess(false);
       setRequestData({ nome: '', email: '', whatsapp: '', username: '', passwordHash: '' });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao solicitar acesso:', err);
-      alert("Erro ao enviar solicitação.");
+      alert("Erro ao enviar solicitação: " + (err.message || "Tente novamente mais tarde."));
     } finally {
       setIsLoading(false);
     }
@@ -255,18 +203,10 @@ const Login: React.FC = () => {
                 Entrar no Sistema <ArrowRight size={16} />
               </button>
 
-              <button 
-                  type="button" 
-                  onClick={migrarParaNuvemMagicamente} 
-                  className="w-full bg-lime-600 text-white shadow-lg py-4 rounded-xl font-bold uppercase text-[9px] mt-2 border-2 border-lime-700 hover:bg-lime-700 transition-all"
-              >
-                  Recuperar Dados do Computador
-              </button>
-
               <button
                 type="button"
                 onClick={() => setRecoveryStep('email')}
-                className="w-full text-[10px] font-black uppercase text-gray-400 tracking-widest hover:text-black transition-colors pt-2"
+                className="w-full text-[10px] font-black uppercase text-gray-400 tracking-widest hover:text-black transition-colors"
               >
                 Esqueci minha senha
               </button>

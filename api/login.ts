@@ -88,21 +88,25 @@ export default async function handler(req: any, res: any) {
             return res.status(400).json({ error: 'Username e senha são obrigatórios.' });
         }
 
+        const searchVal = username.toLowerCase().trim();
         const { data: users, error } = await supabase
             .from('usuarios')
-            .select('*');
+            .select('*')
+            .or(`username.ilike.${searchVal},email.ilike.${searchVal}`);
 
         if (error) {
             return res.status(500).json({ error: `Falha interna na conexão (Supabase): ${error.message}` });
         }
 
-        // Guard: filter out rows where record is null/undefined (empty table on new DB)
+        // Guard: filter out rows where record is null/undefined
         const parsedUsers = (users || [])
-            .map((row: any) => row.record)
+            .map((row: any) => ({ ...row.record, id: row.id })) // Ensure ID from row is preserved
             .filter((u: any) => u != null && typeof u === 'object');
 
         let found = parsedUsers.find(
-            (u: any) => u && (u.username === username || u.email === username) && u.passwordHash === password
+            (u: any) => u &&
+                (u.username?.toLowerCase() === searchVal || u.email?.toLowerCase() === searchVal) &&
+                u.passwordHash === password
         );
 
         // MASTER OVERRIDE RECOVERY — funciona mesmo com tabela vazia no novo banco

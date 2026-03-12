@@ -133,7 +133,7 @@ const AutoCadastro: React.FC = () => {
     try {
       const pendingRecord = {
         ...formData,
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         tipo_solicitacao: tipo || 'novo',
         liderId_generator: liderIdParam,
         status: 'pending',

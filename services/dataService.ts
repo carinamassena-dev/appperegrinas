@@ -122,7 +122,7 @@ export async function loadDisciplesList(page: number = 0, limit: number = 20, se
     const now = Date.now();
 
     // Dynamic Cache Key to support Pagination & Search
-    const cacheKey = `disciplesList_${page}_${searchTerm}`;
+    const cacheKey = global ? `disciplesList_global_${searchTerm}` : `disciplesList_${page}_${searchTerm}`;
     const lsKey = `cached_${cacheKey}`;
 
     // Check In-Memory Cache first (Fastest)
@@ -243,6 +243,7 @@ export async function saveRecord(module: keyof typeof TABLES, item: any): Promis
         }
     } catch (err) {
         console.error(`[DataService] Erro ao salvar em ${module}:`, err);
+        throw err;
     }
 }
 
