@@ -124,17 +124,13 @@ const validateSession = async (user: UserAccount | null) => {
   }
 
   try {
-    const { data, error } = await supabase
+    const { count, error } = await supabase
       .from('usuarios')
       .select('id', { count: 'exact', head: true })
       .eq('id', user.id);
 
-    if (error || !data) {
-      // MASTER BYPASS: Never auto-logout the master user even if table sync fails
-      if (user.role === 'Master' || user.email === 'carina.massena@gmail.com') {
-        _sessionCache = { userId: user.id, valid: true, timestamp: now };
-        return true;
-      }
+    if (error || count === 0) {
+      console.warn("Session validation failed for user:", user.id, error);
       _sessionCache = { userId: user.id, valid: false, timestamp: now };
       return false;
     }
@@ -192,10 +188,7 @@ const ProtectedRoute = ({ children, requireRole, requireEmail = true }: { childr
     return <Navigate to="/" replace />;
   }
 
-  // Prevent Bypass: If not Master, forcefully show Maintenance
-  if (!user?.permissions?.master) {
-    return <Maintenance />;
-  }
+
 
   return <>{children}</>;
 };
@@ -308,12 +301,12 @@ const App: React.FC = () => {
 
         // Force Carina Master to have the correct email
         users = users.map((u: UserAccount) => {
-          if (u?.role === 'Master' && u?.username === 'carina.massena') {
-            return { ...u, email: 'carina.massena@gmail.com' };
-          }
-          if (u?.role === 'Master' && (!u?.passwordHash || u?.passwordHash.trim() === '')) {
-            needsUpdate = true;
-            return { ...u, passwordHash: '#lider12@12', email: 'carina.massena@gmail.com' };
+          if (u?.role === 'Master') {
+            return {
+              ...u,
+              email: u.email || 'carina.massena@gmail.com',
+              passwordHash: u.passwordHash || '#lider12@12'
+            };
           }
           return u;
         });
