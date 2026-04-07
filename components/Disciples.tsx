@@ -236,12 +236,13 @@ const Disciples: React.FC = () => {
   };
 
   const filtered = useMemo(() => {
-    return disciples.filter(d => filterStatus === 'all' || d.status === filterStatus);
+    return disciples.filter(d => d && (filterStatus === 'all' || d.status === filterStatus));
   }, [disciples, filterStatus]);
 
   const groupedByLeader = useMemo(() => {
     const groups: { [key: string]: Disciple[] } = {};
     filtered.forEach(d => {
+      if (!d) return;
       const leader = d.liderDireta || 'Sem Líder Direta';
       if (!groups[leader]) groups[leader] = [];
       groups[leader].push(d);
@@ -250,7 +251,7 @@ const Disciples: React.FC = () => {
   }, [filtered]);
 
   const leaderNames = useMemo(() => {
-    const fromDisciples = disciples.filter(d => d.isLeader).map(d => d.nome);
+    const fromDisciples = disciples.filter(d => d && d.isLeader).map(d => d.nome);
     return Array.from(new Set([...fromDisciples])).sort();
   }, [disciples]);
 
@@ -590,7 +591,7 @@ const Disciples: React.FC = () => {
             </span>
           </h1>
           <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">
-            Gestão de Rebanho • Página {page + 1} de {Math.ceil(totalCount / 20) || 1}
+            Gestão de Rebanho • {viewMode === 'folder' ? 'Visão Geral (Agrupado)' : `Página ${page + 1} de ${Math.ceil(totalCount / 20) || 1}`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
