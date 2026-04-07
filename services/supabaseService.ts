@@ -55,21 +55,30 @@ export const supabaseService = {
     async getAll(table: string) {
         if (!supabase) return []; // Retorna lista vazia se não configurado em vez de crashar
 
-        // Fetches directly without attempting to order by a non-existent native column.
-        // The sorting of JSONB records is handled by the React components.
-        // The sorting of JSONB records is handled by the React components.
         const orgId = getMyOrgId();
         let query = supabase.from(table).select('id, record').order('id', { ascending: true });
         if (orgId) query = query.eq('organization_id', orgId);
 
         const { data, error } = await query;
 
+        // If organization_id column doesn't exist (code 42703), retry without org filter
+        if (error && error.code === '42703') {
+            console.warn(`[Supabase] Column organization_id not found in ${table}, fetching without org filter.`);
+            const { data: fallbackData, error: fallbackError } = await supabase
+                .from(table).select('id, record').order('id', { ascending: true });
+            if (fallbackError) {
+                console.error(`[Supabase Error] Table: ${table}`, fallbackError);
+                throw fallbackError;
+            }
+            return (fallbackData || []).map((row: any) => row.record).filter(Boolean);
+        }
+
         if (error) {
             console.error(`[Supabase Error] Table: ${table}`, error);
             throw error;
         }
 
-        return (data || []).map((row: any) => row.record);
+        return (data || []).map((row: any) => row.record).filter(Boolean);
     },
 
     // Dedicated Backup Function (No Limits)
@@ -220,10 +229,12 @@ export const supabaseService = {
         const { data, error } = await query;
 
         if (error) {
-            console.error('[Supabase Error] getDisciplesList fallback:', error);
-            // Fallback (Not applying pagination here because JSONb specific extracts failed)
+            console.warn('[Supabase] getDisciplesList primary query failed, using fallback:', error.code);
+            // Fallback: fetch raw records WITHOUT organization_id filter
             let fallbackQuery = supabase.from('peregrinas').select('id, record').range(start, end);
-            if (orgId) fallbackQuery = fallbackQuery.eq('organization_id', orgId);
+            if (searchTerm && searchTerm.trim().length >= 3) {
+                fallbackQuery = fallbackQuery.ilike('record->>nome', `%${searchTerm.trim()}%`);
+            }
             const { data: fallback, error: err2 } = await fallbackQuery;
             if (err2) throw err2;
             return (fallback || []).map((row: any) => row.record).filter(Boolean);
@@ -246,10 +257,16 @@ export const supabaseService = {
 
         const { data, error } = await query;
         if (error) {
-            console.error('[Supabase Error] getLeaders:', error);
-            return [];
+            // Retry without org filter if column doesn't exist
+            console.warn('[Supabase] getLeaders retrying without org filter:', error.code);
+            const { data: fallback, error: err2 } = await supabase.from('peregrinas')
+                .select('id, record')
+                .eq('record->isLeader', true)
+                .order('id', { ascending: true });
+            if (err2) { console.error('[Supabase Error] getLeaders:', err2); return []; }
+            return (fallback || []).map((row: any) => row.record).filter(Boolean);
         }
-        return (data || []).map((row: any) => row.record);
+        return (data || []).map((row: any) => row.record).filter(Boolean);
     },
 
     // Ultra-lightweight fetch for Amigo Secreto (Egress Saver)
