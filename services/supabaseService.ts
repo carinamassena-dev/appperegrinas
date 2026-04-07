@@ -226,7 +226,7 @@ export const supabaseService = {
             if (orgId) fallbackQuery = fallbackQuery.eq('organization_id', orgId);
             const { data: fallback, error: err2 } = await fallbackQuery;
             if (err2) throw err2;
-            return (fallback || []).map((row: any) => row.record);
+            return (fallback || []).map((row: any) => row.record).filter(Boolean);
         }
 
         // Return a mapped lightweight list

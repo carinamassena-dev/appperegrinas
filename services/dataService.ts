@@ -151,7 +151,7 @@ export async function loadDisciplesList(page: number = 0, limit: number = 20, se
         let data;
         if (global) {
             data = await supabaseService.getAll('peregrinas');
-            data = data.map((d: any) => d.record);
+            data = data.map((d: any) => d.record).filter(Boolean);
         } else {
             data = await supabaseService.getDisciplesList(page, limit, searchTerm);
         }
