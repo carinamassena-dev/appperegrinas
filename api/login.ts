@@ -150,44 +150,7 @@ export default async function handler(req: any, res: any) {
             }
         }
 
-        // SYNC REAL UUID FROM SUPABASE AUTH FOR MASTER USER
-        if (found && (found.role === 'Master' || found.email === 'carina.massena@gmail.com')) {
-            let newRealId = null;
-            try {
-                // Find true UUID by email in auth.users
-                const { data: authData } = await supabase.auth.admin.listUsers();
-                if (authData && authData.users) {
-                    const authMatch = authData.users.find((u: any) => u.email === 'carina.massena@gmail.com');
-                    if (authMatch) newRealId = authMatch.id;
-                }
-            } catch (err) {
-                console.error("Failed to sync Master UUID:", err);
-            }
-
-            // If no auth match exists yet, but we are still using placeholders, FORCE a valid UUID format
-            if (!newRealId && (found.id === '1' || found.id === 'master_user')) {
-                newRealId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                    return v.toString(16);
-                });
-            }
-
-            if (newRealId && newRealId !== found.id) {
-                const oldId = found.id;
-                found.id = newRealId;
-
-                // Ensure record also has the correct ID internally
-                found.id = newRealId;
-
-                // Update the record in usuarios to hold the real UUID
-                await supabase.from('usuarios').upsert({ id: found.id, record: found });
-
-                // Delete the old placeholder record
-                if (oldId === '1' || oldId === 'master_user') {
-                    await supabase.from('usuarios').delete().eq('id', oldId);
-                }
-            }
-        }
+        // Keep the existing user ID from the database — no UUID overwriting
 
         if (found) {
             if (found.status === 'pending') {
