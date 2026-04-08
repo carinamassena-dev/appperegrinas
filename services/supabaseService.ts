@@ -20,10 +20,6 @@ export const supabaseService = {
         }
 
         const orgId = getMyOrgId();
-        if (orgId && !item.organization_id) {
-            item.organization_id = orgId;
-        }
-
         const payload: any = {
             id: item.id,
             record: item,
@@ -44,6 +40,18 @@ export const supabaseService = {
             .upsert(payload, { onConflict: 'id' })
             .select();
 
+        // Fallback for missing organization_id column
+        if (error && error.code === '42703') {
+            const fallbackPayload = { ...payload };
+            delete fallbackPayload.organization_id;
+            const { data: fallbackResult, error: fallbackError } = await supabase
+                .from(table)
+                .upsert(fallbackPayload, { onConflict: 'id' })
+                .select();
+            if (fallbackError) throw fallbackError;
+            return fallbackResult;
+        }
+
         if (error) {
             console.error(`[Supabase Error] Table: ${table}`, error);
             throw error;
@@ -51,9 +59,9 @@ export const supabaseService = {
         return result;
     },
 
-    // Generic Get All
+    // Standard Select ALL with Org Filter Fallback
     async getAll(table: string) {
-        if (!supabase) return []; // Retorna lista vazia se não configurado em vez de crashar
+        if (!supabase) return [];
 
         const orgId = getMyOrgId();
         let query = supabase.from(table).select('id, record').order('id', { ascending: true });
@@ -61,16 +69,11 @@ export const supabaseService = {
 
         const { data, error } = await query;
 
-        // If organization_id column doesn't exist (code 42703), retry without org filter
+        // Code 42703: Column does not exist
         if (error && error.code === '42703') {
-            console.warn(`[Supabase] Column organization_id not found in ${table}, fetching without org filter.`);
-            const { data: fallbackData, error: fallbackError } = await supabase
-                .from(table).select('id, record').order('id', { ascending: true });
-            if (fallbackError) {
-                console.error(`[Supabase Error] Table: ${table}`, fallbackError);
-                throw fallbackError;
-            }
-            return (fallbackData || []).map((row: any) => row.record).filter(Boolean);
+            const { data: fallback, error: err2 } = await supabase.from(table).select('id, record').order('id', { ascending: true });
+            if (err2) throw err2;
+            return (fallback || []).map((row: any) => row.record).filter(Boolean);
         }
 
         if (error) {
@@ -86,42 +89,58 @@ export const supabaseService = {
         if (!supabase) return [];
         const orgId = getMyOrgId();
 
-        // Select 'id, record' for NoSQL-style tables, '*' for Relational ones
         let query = supabase.from(table).select(isRelational ? '*' : 'id, record');
-
-        // Only filter by org if not a global table
         if (orgId && !isGlobal) query = query.eq('organization_id', orgId);
 
         const { data, error } = await query;
+
+        if (error && error.code === '42703') {
+            const { data: fallback, error: err2 } = await supabase.from(table).select(isRelational ? '*' : 'id, record');
+            if (err2) throw err2;
+            return fallback || [];
+        }
+
         if (error) {
             console.error(`[Supabase Backup Error] Table: ${table}`, error);
             throw error;
         }
-
-        // Return raw rows if relational, extract .record if NoSQL
-        return isRelational ? (data || []) : (data || []).map((row: any) => row.record);
+        return data || [];
     },
 
-    // Upsert for Relational Tables (Direct columns)
-    async upsertRelational(table: string, item: any) {
-        if (!supabase) throw new Error("Supabase não configurado.");
+    // Generic delete
+    async delete(table: string, id: string) {
+        if (!supabase) return;
         const orgId = getMyOrgId();
+        let query = supabase.from(table).delete().eq('id', id);
+        if (orgId) query = query.eq('organization_id', orgId);
 
-        const payload = { ...item };
-        if (orgId && !payload.organization_id && table !== 'organizations') {
-            payload.organization_id = orgId;
+        const { error } = await query;
+
+        if (error && error.code === '42703') {
+            const { error: err2 } = await supabase.from(table).delete().eq('id', id);
+            if (err2) throw err2;
+            return;
         }
 
-        const { data, error } = await supabase
-            .from(table)
-            .upsert(payload, { onConflict: 'id' })
-            .select();
+        if (error) throw error;
+    },
 
-        if (error) {
-            console.error(`[Supabase Relational Error] Table: ${table}`, error);
-            throw error;
+    async getById(table: string, id: string) {
+        if (!supabase) return null;
+        const orgId = getMyOrgId();
+        let query = supabase.from(table).select('record').eq('id', id);
+        if (orgId) query = query.eq('organization_id', orgId);
+
+        const { data, error } = await query;
+
+        if (error && error.code === '42703') {
+            const { data: fallback, error: err2 } = await supabase.from(table).select('record').eq('id', id);
+            if (err2) throw err2;
+            return fallback?.[0]?.record || null;
         }
-        return data;
+
+        if (error) return null;
+        return data?.[0]?.record || null;
     },
 
     // Get Count Header Only (Extreme Egress Saver)
@@ -132,6 +151,13 @@ export const supabaseService = {
         if (orgId) query = query.eq('organization_id', orgId);
 
         const { count, error } = await query;
+
+        if (error && error.code === '42703') {
+            const { count: fallbackCount, error: err2 } = await supabase.from(table).select('*', { count: 'exact', head: true });
+            if (err2) return 0;
+            return fallbackCount || 0;
+        }
+
         if (error) {
             console.error(`[Supabase Count Error] Table: ${table}`, error);
             return 0;
@@ -139,18 +165,6 @@ export const supabaseService = {
         return count || 0;
     },
 
-    // Generic Delete
-    async delete(table: string, id: string) {
-        if (!supabase) throw new Error("Supabase não configurado.");
-        const orgId = getMyOrgId();
-        let query = supabase.from(table).delete().eq('id', id);
-        if (orgId) query = query.eq('organization_id', orgId);
-
-        const { error } = await query;
-
-
-        if (error) throw error;
-    },
     // Specific for Disciples (Peregrinas)
     async saveDisciple(disciple: any) {
         return this.upsert('peregrinas', disciple);
@@ -182,6 +196,7 @@ export const supabaseService = {
     async getDisciples() {
         return this.getAll('peregrinas');
     },
+
 
     // Optimized List Fetcher (Now with Pagination & Backend Search)
     async getDisciplesList(page: number = 0, limit: number = 20, searchTerm: string = '') {
@@ -287,11 +302,17 @@ export const supabaseService = {
 
         const { data, error } = await query;
 
-        if (error) {
-            console.error('[Supabase Error] getDisciplesForAmigoSecreto:', error);
-            return [];
+        if (error && error.code === '42703') {
+            const { data: fallback, error: err2 } = await supabase
+                .from('peregrinas')
+                .select(`id, nome:record->>nome, whatsapp:record->>whatsapp, liderDireta:record->>liderDireta`)
+                .eq('record->>status', 'Ativa');
+            if (err2) return [];
+            return (fallback || []).map((row: any) => row);
         }
-        return data as any[];
+
+        if (error) return [];
+        return (data || []).map((row: any) => row);
     },
 
     // Optimized Search for modal / selects (3 letters minimum)
@@ -309,6 +330,16 @@ export const supabaseService = {
 
         if (orgId) query = query.eq('organization_id', orgId);
         const { data, error } = await query.ilike('record->>nome', `%${term}%`).limit(20);
+
+        if (error && error.code === '42703') {
+            const { data: fallback, error: err2 } = await supabase
+                .from('peregrinas')
+                .select(`id, nome:record->>nome, whatsapp:record->>whatsapp, liderDireta:record->>liderDireta`)
+                .ilike('record->>nome', `%${term}%`)
+                .limit(20);
+            if (err2) return [];
+            return fallback as any[];
+        }
 
         if (error) {
             console.error('[Supabase Error] searchDisciplesByName:', error);
