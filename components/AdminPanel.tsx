@@ -5,24 +5,32 @@ import {
   Trash2, Plus, UserPlus, Edit2,
   RefreshCw, X, Terminal, Loader2,
   Activity, Sparkles, DatabaseZap, Link as LinkIcon,
-  DollarSign, Calendar, CheckCircle2, ArrowRight, Sprout, Download, Upload, AlertTriangle
+  DollarSign, Calendar, CheckCircle2, ArrowRight, Sprout, Download, Upload, AlertTriangle,
+  FileText, Shield
 } from 'lucide-react';
-import { UserAccount, BaptismStatus, CDLevel, TransactionType, Disciple, Leader, FinanceRecord, Harvest, Event as AppEvent } from '../types';
+import { UserAccount, AuditLog, AuditLogType } from '../types';
 import { AuthContext } from '../App';
-import { fetchSheetCSV, parseCSV, sendDataToSheet } from '../services/googleSheetsService';
 import { supabaseService } from '../services/supabaseService';
 import { loadData, saveRecord, deleteRecord, loadDisciplesList, generateFullSystemBackup, restoreFromBackup } from '../services/dataService';
-import { refreshSupabaseClient } from '../services/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { getAuditLogs, getCachedAuditLogs, logAction, AuditLog, AuditLogType } from '../services/auditService';
+import { getAuditLogs, getCachedAuditLogs, logAction } from '../services/auditService';
 
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useContext(AuthContext);
-  const [activeTab, setActiveTab] = useState<'users' | 'requests' | 'connection' | 'logs'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'requests' | 'integration' | 'audit'>('users');
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [systemLogs, setSystemLogs] = useState<AuditLog[]>([]);
+  const [logFilters, setLogFilters] = useState({
+    user: '',
+    type: '' as AuditLogType | '',
+    startDate: '',
+    endDate: ''
+  });
 
   const [stats, setStats] = useState({
     disciples: 0,
@@ -30,17 +38,6 @@ const AdminPanel: React.FC = () => {
     finance: 0,
     harvest: 0,
     events: 0
-  });
-
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isMigrating, setIsMigrating] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [systemLogs, setSystemLogs] = useState<AuditLog[]>([]);
-  const [logFilters, setLogFilters] = useState({
-    user: '',
-    type: '' as AuditLogType | '',
-    startDate: '',
-    endDate: ''
   });
 
   const updateStats = async () => {
@@ -64,23 +61,32 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // Load users from Supabase
-      const supaUsers = await loadData<UserAccount>('users');
+  const fetchData = async (force: boolean = false) => {
+    setIsLoading(true);
+    try {
+      // Forçamos o recarregamento de usuários para ver novas solicitações
+      const supaUsers = await loadData<UserAccount>('users', force);
       setUsers(supaUsers || []);
 
-      // Load audit logs from Supabase
       const logs = await getAuditLogs();
       setSystemLogs(logs || []);
 
       updateStats();
-    };
-    fetchData();
+    } catch (err) {
+      console.error('[Admin] Erro ao carregar dados:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData(); // Inicial sem force por padrão, mas Admin Panel deve carregar fresh
+
+    // Na verdade, Admin Panel SEMPRE deve carregar fresh para o Master
+    fetchData(true);
 
     const handleAuditUpdate = () => setSystemLogs(getCachedAuditLogs());
     window.addEventListener('audit_log_added', handleAuditUpdate);
-
     return () => window.removeEventListener('audit_log_added', handleAuditUpdate);
   }, []);
 
@@ -89,12 +95,10 @@ const AdminPanel: React.FC = () => {
   };
 
   const handleSaveUser = async (userData: Partial<UserAccount>) => {
-    let updatedUsers = [...users];
     let changedUser: UserAccount;
 
     if (userData.id) {
       changedUser = userData as UserAccount;
-      updatedUsers = users.map(u => (u && u.id === changedUser.id) ? changedUser : u);
       addAuditLog("Usuário Editado", `Perfil @${changedUser.username} alterado`, "USUARIO");
     } else {
       changedUser = {
@@ -104,30 +108,48 @@ const AdminPanel: React.FC = () => {
         status: 'active',
         organization_id: currentUser?.organization_id
       } as UserAccount;
-      updatedUsers = [changedUser, ...users];
       addAuditLog("Usuário Criado", `Novo usuário @${userData.username} adicionado`, "USUARIO");
     }
 
-    setUsers(updatedUsers);
     await saveRecord('users', changedUser);
+    setUsers(prev => prev.map(u => (u && u.id === changedUser.id) ? changedUser : u));
+    if (!userData.id) setUsers(prev => [changedUser, ...prev]);
+
     setShowUserModal(false);
     setEditingUser(null);
+    fetchData(true);
   };
 
   const handleApproveUser = async (userToApprove: UserAccount) => {
     if (!confirm(`Deseja aprovar o acesso de ${userToApprove.nome}?`)) return;
-    const updatedUser = { ...userToApprove, status: 'active' } as UserAccount;
-    const updatedUsers = users.map(u => (u && u.id === updatedUser.id) ? updatedUser : u);
-    setUsers(updatedUsers);
-    await saveRecord('users', updatedUser);
-    addAuditLog("Acesso Aprovado", `Solicitação de @${updatedUser.username} foi aprovada.`, "USUARIO");
+
+    const updatedUser = {
+      ...userToApprove,
+      status: 'active',
+      permissions: userToApprove.permissions || {
+        dashboard: 'view',
+        disciples: 'view',
+        leaders: 'none',
+        finance: 'none',
+        events: 'view',
+        harvest: 'none'
+      }
+    } as UserAccount;
+
+    try {
+      await saveRecord('users', updatedUser);
+      setUsers(prev => prev.map(u => (u && u.id === updatedUser.id) ? updatedUser : u));
+      addAuditLog("Acesso Aprovado", `Solicitação de @${updatedUser.username} foi aprovada.`, "USUARIO");
+      alert("Usuário aprovado com sucesso!");
+    } catch (err) {
+      alert("Erro ao aprovar usuário.");
+    }
   };
 
   const handleRejectUser = async (userToReject: UserAccount) => {
     if (!confirm(`Deseja RECUSAR e apagar a solicitação de ${userToReject.nome}?`)) return;
-    const updatedUsers = users.filter(u => u && u.id !== userToReject.id);
-    setUsers(updatedUsers);
     await deleteRecord('users', userToReject.id);
+    setUsers(prev => prev.filter(u => u && u.id !== userToReject.id));
     addAuditLog("Acesso Recusado", `Solicitação de @${userToReject.username} foi rejeitada e apagada.`, "USUARIO");
   };
 
@@ -136,10 +158,26 @@ const AdminPanel: React.FC = () => {
     if (!confirm("Deseja realmente excluir este usuário?")) return;
 
     const userToDelete = users.find(u => u && u.id === id);
-    const updatedUsers = users.filter(u => u && u.id !== id);
-    setUsers(updatedUsers);
     await deleteRecord('users', id);
+    setUsers(prev => prev.filter(u => u && u.id !== id));
     addAuditLog("Usuário Excluído", `Usuário @${userToDelete?.username} removido do sistema`, "USUARIO");
+  };
+
+  const updatePendingUser = (id: string, updates: Partial<UserAccount>) => {
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+  };
+
+  const updatePermission = (id: string, module: string, value: string) => {
+    setUsers(prev => prev.map(u => {
+      if (u.id !== id) return u;
+      const currentPermissions = u.permissions || {
+        dashboard: 'none', disciples: 'none', leaders: 'none', finance: 'none', events: 'none', harvest: 'none'
+      };
+      return {
+        ...u,
+        permissions: { ...currentPermissions, [module]: value }
+      };
+    }));
   };
 
   const filteredLogs = systemLogs.filter(log => {
@@ -151,308 +189,52 @@ const AdminPanel: React.FC = () => {
     return matchUser && matchType && matchStart && matchEnd;
   });
 
+  if (!currentUser || currentUser.role !== 'Master') {
+    return (
+      <div className="p-12 text-center">
+        <h1 className="text-2xl font-black text-red-500 uppercase">Acesso Restrito</h1>
+        <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest mt-2">Apenas usuários Master podem acessar este painel.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 md:space-y-8 animate-in pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 px-2 md:px-0 text-left">
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-12 pb-20">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black uppercase tracking-tight text-gray-900">Painel Master</h1>
-          <p className="text-gray-400 font-medium text-sm italic">Infraestrutura e Dados</p>
+          <h1 className="text-4xl font-black uppercase tracking-tighter text-gray-900 leading-none">Painel Master</h1>
+          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2">Infraestrutura e Dados</p>
         </div>
-        <div className="flex bg-white p-1.5 rounded-2xl border shadow-sm w-full md:w-auto overflow-x-auto">
-          <button onClick={() => setActiveTab('users')} className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-black text-white shadow-lg' : 'text-gray-400'}`}>Acessos</button>
-          <button onClick={() => setActiveTab('requests')} className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative ${activeTab === 'requests' ? 'bg-black text-white shadow-lg' : 'text-gray-400'}`}>
-            Solicitações
-            {users.filter(u => u && u.status === 'pending').length > 0 && (
-              <span className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
-                {users.filter(u => u && u.status === 'pending').length}
-              </span>
-            )}
-          </button>
-          <button onClick={() => setActiveTab('connection')} className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'connection' ? 'bg-black text-white shadow-lg' : 'text-gray-400'}`}>Integração</button>
-          <button onClick={() => setActiveTab('logs')} className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'logs' ? 'bg-black text-white shadow-lg' : 'text-gray-400'}`}>Auditoria</button>
+
+        <div className="flex bg-gray-100 p-1.5 rounded-[1.5rem] gap-1 overflow-x-auto">
+          {[
+            { id: 'users', label: 'Acessos', icon: <Shield size={14} /> },
+            { id: 'requests', label: 'Solicitações', badge: users.filter(u => u?.status === 'pending').length, icon: <Users size={14} /> },
+            { id: 'integration', label: 'Integração', icon: <Database size={14} /> },
+            { id: 'audit', label: 'Auditoria', icon: <FileText size={14} /> }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                }`}
+            >
+              {tab.icon}
+              {tab.label}
+              {tab.badge ? (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center border-2 border-white">
+                  {tab.badge}
+                </span>
+              ) : null}
+            </button>
+          ))}
         </div>
       </div>
 
-      {activeTab === 'logs' && (
-        <div className="space-y-6 text-left animate-in fade-in">
-          <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h2 className="text-xl font-black uppercase flex items-center gap-3 tracking-tighter"><Terminal size={24} /> Auditoria do Sistema</h2>
-              <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                <input
-                  type="text"
-                  placeholder="Filtrar Usuário..."
-                  className="flex-1 md:w-32 p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none border border-transparent focus:border-lime-200"
-                  value={logFilters.user}
-                  onChange={e => setLogFilters({ ...logFilters, user: e.target.value })}
-                />
-                <select
-                  className="flex-1 md:w-32 p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none cursor-pointer"
-                  value={logFilters.type}
-                  onChange={e => setLogFilters({ ...logFilters, type: e.target.value as any })}
-                >
-                  <option value="">Todos Tipos</option>
-                  <option value="USUARIO">Usuários</option>
-                  <option value="UI">Interface</option>
-                  <option value="EVENTO">Eventos</option>
-                  <option value="FINANCEIRO">Financeiro</option>
-                  <option value="ERRO">Erros</option>
-                </select>
-                <input
-                  type="date"
-                  className="flex-1 md:w-32 p-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none"
-                  value={logFilters.startDate}
-                  onChange={e => setLogFilters({ ...logFilters, startDate: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="overflow-x-auto rounded-3xl border border-gray-100">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="p-4 text-[9px] font-black uppercase text-gray-400">Data/Hora</th>
-                    <th className="p-4 text-[9px] font-black uppercase text-gray-400">Usuário</th>
-                    <th className="p-4 text-[9px] font-black uppercase text-gray-400">Ação</th>
-                    <th className="p-4 text-[9px] font-black uppercase text-gray-400">Detalhes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="p-4 text-[10px] font-medium text-gray-400 tabular-nums">{new Date(log.timestamp).toLocaleString('pt-BR')}</td>
-                      <td className="p-4">
-                        <span className="text-[10px] font-black uppercase px-2 py-1 bg-gray-100 rounded-lg">{log.user}</span>
-                      </td>
-                      <td className="p-4">
-                        <span className={`text-[10px] font-black uppercase ${log.type === 'ERRO' ? 'text-red-500' : 'text-gray-900'}`}>{log.action}</span>
-                      </td>
-                      <td className="p-4 text-[10px] text-gray-500 font-medium leading-relaxed max-w-xs md:max-w-md truncate md:whitespace-normal">{log.details}</td>
-                    </tr>
-                  ))}
-                  {filteredLogs.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="p-12 text-center text-gray-300 font-black uppercase text-[10px] tracking-widest">Nenhum log encontrado</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'connection' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-in fade-in">
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 text-lime-400/5 group-hover:scale-110 transition-transform pointer-events-none">
-                <DatabaseZap size={100} />
-              </div>
-              <div className="relative z-10 space-y-6">
-                <div>
-                  <h3 className="text-xl font-black uppercase flex items-center gap-3 tracking-tighter">
-                    <DatabaseZap className="text-lime-600" size={24} /> Supabase
-                  </h3>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Banco de Dados Principal</p>
-                </div>
-
-                <div className="p-4 bg-green-50 border border-green-100 rounded-2xl">
-                  <p className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-2">
-                    <CheckCircle2 size={14} /> Configurado via Vercel (Auto)
-                  </p>
-                  <p className="text-[9px] text-green-600 mt-1">A URL e Key estão sendo carregadas das variáveis de ambiente automaticamente.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
-              <div>
-                <h3 className="text-xl font-black uppercase flex items-center gap-3 tracking-tighter">
-                  <Sparkles className="text-purple-600" size={24} /> Limpeza de Dados
-                </h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Utilitários de Manutenção</p>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={async () => {
-                    if (!confirm("Isso removerá peregrinas com o mesmo nome (mantendo apenas uma). Deseja continuar?")) return;
-                    setIsSyncing(true);
-                    try {
-                      // Fetch ALL records for deduplication processing
-                      const all = await supabaseService.getAll('peregrinas');
-                      const seen = new Set();
-                      const toDelete: string[] = [];
-                      const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-
-                      all.forEach((d: any) => {
-                        const n = normalize(d.record?.nome || '');
-                        if (n && seen.has(n)) {
-                          toDelete.push(d.id);
-                        } else if (n) {
-                          seen.add(n);
-                        }
-                      });
-
-                      if (toDelete.length === 0) {
-                        alert("Nenhuma duplicata encontrada.");
-                      } else {
-                        if (confirm(`Encontradas ${toDelete.length} duplicatas. Confirmar exclusão?`)) {
-                          // Successive deletion
-                          for (const id of toDelete) {
-                            await deleteRecord('disciples', id);
-                          }
-                          alert(`${toDelete.length} duplicatas removidas com sucesso!`);
-                          window.location.reload();
-                        }
-                      }
-                    } catch (e) {
-                      console.error(e);
-                      alert("Erro ao limpar duplicatas.");
-                    } finally {
-                      setIsSyncing(false);
-                    }
-                  }}
-                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-purple-50 rounded-2xl border border-transparent hover:border-purple-200 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Trash2 size={20} className="text-gray-400 group-hover:text-purple-600" />
-                    <span className="text-xs font-black uppercase text-gray-900">Limpar Duplicatas</span>
-                  </div>
-                  {isSyncing ? <Loader2 size={16} className="animate-spin text-purple-600" /> : <ArrowRight size={16} className="text-gray-300" />}
-                </button>
-
-                <button
-                  onClick={() => {
-                    localStorage.clear();
-                    alert("Cache local limpo! O sistema recarregará os dados do servidor.");
-                    window.location.reload();
-                  }}
-                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-amber-50 rounded-2xl border border-transparent hover:border-amber-200 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <RefreshCw size={20} className="text-gray-400 group-hover:text-amber-600" />
-                    <span className="text-xs font-black uppercase text-gray-900">Limpar Cache Local</span>
-                  </div>
-                  <ArrowRight size={16} className="text-gray-300 group-hover:translate-x-1 transition-transform" />
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
-              <div>
-                <h3 className="text-xl font-black uppercase flex items-center gap-3 tracking-tighter">
-                  <Database size={24} /> Backup & Restauração
-                </h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Segurança dos Dados</p>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={async () => {
-                    const backup = await generateFullSystemBackup();
-                    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `peregrinas_backup_${new Date().toISOString().split('T')[0]}.json`;
-                    a.click();
-                    addAuditLog("Backup Exportado", "Backup completo do sistema via JSON", "SISTEMA");
-                  }}
-                  className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-lime-50 rounded-2xl border border-transparent hover:border-lime-200 transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Download size={20} className="text-gray-400 group-hover:text-lime-600" />
-                    <span className="text-xs font-black uppercase text-gray-900">Exportar JSON</span>
-                  </div>
-                  <ArrowRight size={16} className="text-gray-300 group-hover:translate-x-1 transition-transform" />
-                </button>
-
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept=".json"
-                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-
-                      if (!confirm("⚠️ ATENÇÃO: Restaurar um backup substituirá registros conflitantes. Deseja prosseguir?")) {
-                        e.target.value = '';
-                        return;
-                      }
-
-                      setIsSyncing(true);
-                      try {
-                        const content = await file.text();
-                        const backupData = JSON.parse(content);
-                        const result = await restoreFromBackup(backupData);
-
-                        if (result.success) {
-                          alert("✅ Restauração concluída com sucesso!");
-                          addAuditLog("Backup Restaurado", "Dados importados via arquivo JSON", "SISTEMA");
-                          window.location.reload();
-                        } else {
-                          alert("❌ Alguns erros ocorreram:\n" + result.errors.join('\n'));
-                        }
-                      } catch (err) {
-                        alert("❌ Falha crítica ao ler arquivo: " + err);
-                      } finally {
-                        setIsSyncing(false);
-                        e.target.value = '';
-                      }
-                    }}
-                  />
-                  <button className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-blue-50 rounded-2xl border border-transparent hover:border-blue-200 transition-all group pointer-events-none">
-                    <div className="flex items-center gap-3">
-                      <Upload size={20} className="text-gray-400 group-hover:text-blue-600" />
-                      <span className="text-xs font-black uppercase text-gray-900">Importar Backup</span>
-                    </div>
-                    {isSyncing ? <Loader2 size={16} className="animate-spin text-blue-600" /> : <ArrowRight size={16} className="text-gray-300" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex gap-3">
-                <AlertTriangle size={16} className="text-amber-600 shrink-0" />
-                <p className="text-[9px] text-amber-700 font-medium">Use a importação apenas para recuperação de desastres ou migração. O processo é irreversível.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-8 h-full flex flex-col">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-black uppercase flex items-center gap-3 tracking-tighter"><Activity className="text-gray-400" /> Resumo de Atividade</h2>
-                <div className="flex flex-wrap gap-4">
-                  <StatMini label="Peregrinas" value={stats.disciples} icon={Users} />
-                  <StatMini label="Vidas" value={stats.harvest} icon={Sprout} />
-                  <StatMini label="Caixa" value={stats.finance} icon={DollarSign} />
-                </div>
-              </div>
-
-              <div className="flex-1 bg-gray-950 rounded-[2.5rem] p-6 text-lime-400 font-mono text-[11px] space-y-2 overflow-y-auto min-h-[400px] border-8 border-white shadow-inner custom-scrollbar">
-                <div className="flex items-center gap-2 mb-4 text-white/20 uppercase font-black text-[9px]">
-                  <Terminal size={14} /> <span>Live Feed_</span>
-                </div>
-                {systemLogs.slice(0, 50).map((log) => (
-                  <div key={log.id} className={`flex gap-3 leading-relaxed animate-in slide-in-from-left-2 ${log.type === 'ERRO' ? 'text-red-400' : 'text-gray-500'}`}>
-                    <span className="opacity-40">[{new Date(log.timestamp).toLocaleTimeString('pt-BR')}]</span>
-                    <span className="font-bold">[{log.type}]</span>
-                    <span className="text-gray-300">{log.action}: {log.details.substring(0, 100)}</span>
-                  </div>
-                ))}
-                {systemLogs.length === 0 && <div className="text-gray-600 italic">Nenhuma atividade registrada...</div>}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {activeTab === 'users' && (
         <div className="space-y-6 text-left animate-in fade-in">
-          <button onClick={() => { setEditingUser({ nome: '', username: '', role: 'Operador', permissions: { dashboard: 'view', disciples: 'view', leaders: 'none', finance: 'none', events: 'none', harvest: 'view', master: false } }); setShowUserModal(true); }} className="w-full md:w-auto bg-black text-white px-8 py-5 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all">
+          <button onClick={() => { setEditingUser({ nome: '', username: '', role: 'Discípula', permissions: { dashboard: 'view', disciples: 'view', leaders: 'none', finance: 'none', events: 'none', harvest: 'view' } }); setShowUserModal(true); }} className="w-full md:w-auto bg-black text-white px-8 py-5 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all">
             <UserPlus size={20} /> Adicionar Novo Usuário
           </button>
 
@@ -481,53 +263,63 @@ const AdminPanel: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
 
-          {/* User CRUD Modal */}
-          {showUserModal && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-              <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 space-y-8 animate-in relative overflow-hidden">
-                <div className="flex justify-between items-center border-b pb-6">
-                  <div>
-                    <h2 className="text-2xl font-black uppercase text-gray-900">{editingUser?.id ? 'Editar Usuário' : 'Novo Usuário'}</h2>
-                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Painel de Acessos Master</p>
-                  </div>
-                  <button onClick={() => setShowUserModal(false)}><X size={24} /></button>
+      {activeTab === 'requests' && (
+        <div className="space-y-6 text-left animate-in fade-in">
+          <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-lime-50 rounded-2xl flex items-center justify-center text-lime-600">
+                  <Users size={24} />
                 </div>
+                <div>
+                  <h2 className="text-xl font-black uppercase tracking-tighter text-gray-900">Solicitações Pendentes</h2>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Defina as permissões e aprove o acesso</p>
+                </div>
+              </div>
+              <button onClick={() => fetchData(true)} className="p-3 hover:bg-gray-50 rounded-xl text-gray-400 transition-all" title="Atualizar">
+                <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
+              </button>
+            </div>
 
-                <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <InputField label="Nome Completo" value={editingUser?.nome} onChange={(v: string) => setEditingUser({ ...editingUser, nome: v })} />
-                    <InputField label="Username (Login)" value={editingUser?.username} onChange={(v: string) => setEditingUser({ ...editingUser, username: v })} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Senha de Acesso</label>
-                    <input
-                      type="text"
-                      placeholder={editingUser?.id ? "Digite para alterar a senha..." : "Defina uma senha..."}
-                      className="w-full mt-2 p-4 bg-gray-50 rounded-2xl font-bold outline-none border border-transparent focus:border-lime-200 transition-all text-sm"
-                      onChange={(e) => setEditingUser({ ...editingUser, passwordHash: e.target.value })}
-                    />
-                    {editingUser?.id && <p className="text-[9px] text-gray-400 mt-2 font-bold uppercase">Deixe em branco para não alterar a senha atual desse usuário.</p>}
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Perfil de Acesso</label>
-                    <div className="flex gap-2">
-                      {['Master', 'Líder', 'Discípula'].map((role) => (
-                        <button
-                          key={role}
-                          onClick={() => setEditingUser({ ...editingUser, role: role as any, permissions: { ...editingUser.permissions, master: role === 'Master' } })}
-                          className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${editingUser?.role === role ? 'bg-black text-white border-black' : 'border-gray-100 text-gray-400'}`}
-                        >
-                          {role}
-                        </button>
-                      ))}
+            <div className="grid grid-cols-1 gap-8">
+              {users.filter(u => u && u.status === 'pending').map(u => (
+                <div key={u.id} className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-black uppercase text-base text-gray-900">{u?.nome || 'Sem Nome'}</h3>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">@ {u?.username}</p>
+                    </div>
+                    <div className="space-y-2">
+                      {u?.whatsapp && <p className="text-xs text-gray-500 font-bold tracking-tight">📱 {u.whatsapp}</p>}
+                      {u?.email && <p className="text-xs text-gray-500 font-bold tracking-tight">📧 {u.email}</p>}
+                    </div>
+                    <div className="pt-4 border-t border-gray-200">
+                      <label className="text-[9px] font-black uppercase text-gray-400 block mb-2">Nível de Acesso (Role)</label>
+                      <select
+                        className="w-full p-3 bg-white rounded-xl font-bold text-xs outline-none border border-gray-200"
+                        value={u.role || 'Discípula'}
+                        onChange={(e) => updatePendingUser(u.id, { role: e.target.value as any })}
+                      >
+                        <option value="Discípula">Discípula</option>
+                        <option value="Líder">Líder</option>
+                        <option value="Master">Master</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2 pt-4">
+                      <button onClick={() => handleApproveUser(u)} className="flex-1 bg-black text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all hover:bg-gray-800 shadow-lg shadow-gray-200">
+                        Aprovar
+                      </button>
+                      <button onClick={() => handleRejectUser(u)} className="px-5 py-4 bg-red-100 text-red-600 rounded-2xl transition-all hover:bg-red-200">
+                        <X size={18} strokeWidth={3} />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="space-y-4">
-                    <h3 className="text-[10px] font-black uppercase text-gray-900 tracking-tighter border-b pb-2">Permissões Detalhadas</h3>
-                    <div className="grid grid-cols-2 gap-6">
+                  <div className="lg:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-inner">
+                    <h4 className="text-[10px] font-black uppercase text-gray-900 tracking-tighter border-b pb-3 mb-4">Acesso aos Módulos</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       {[
                         { id: 'dashboard', label: 'Dashboard' },
                         { id: 'disciples', label: 'Peregrinas' },
@@ -536,81 +328,141 @@ const AdminPanel: React.FC = () => {
                         { id: 'events', label: 'Eventos' },
                         { id: 'harvest', label: 'Colheita' }
                       ].map((module) => (
-                        <div key={module.id} className="space-y-2">
+                        <div key={module.id} className="space-y-1.5">
                           <label className="text-[9px] font-black uppercase text-gray-400">{module.label}</label>
                           <select
-                            className="w-full p-3 bg-gray-50 rounded-xl font-bold text-xs outline-none"
-                            value={editingUser?.permissions?.[module.id as keyof typeof editingUser.permissions] as string}
-                            onChange={(e) => setEditingUser({ ...editingUser, permissions: { ...editingUser.permissions, [module.id]: e.target.value as any } })}
+                            className="w-full p-2.5 bg-gray-50 rounded-lg font-bold text-[10px] outline-none border border-transparent focus:border-black transition-all"
+                            value={u.permissions?.[module.id as keyof typeof u.permissions] || 'none'}
+                            onChange={(e) => updatePermission(u.id, module.id, e.target.value)}
                           >
+                            <option value="none">Bloqueado</option>
                             <option value="view">Visualizar</option>
-                            <option value="edit">Editar/Anotar</option>
-                            <option value="none">Nenhum Acesso</option>
+                            <option value="edit">Editar</option>
                           </select>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
-
-                <div className="flex gap-4 pt-6 border-t">
-                  <button onClick={() => setShowUserModal(false)} className="flex-1 py-4 font-black text-gray-400 uppercase text-xs tracking-widest">DESCARTAR</button>
-                  <button
-                    onClick={() => handleSaveUser(editingUser)}
-                    disabled={!editingUser?.username}
-                    className="flex-1 py-4 bg-black text-white font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest disabled:opacity-50"
-                  >
-                    {editingUser?.id ? 'Salvar Alterações' : 'Criar Conta Agora'}
-                  </button>
+              ))}
+              {users.filter(u => u && u.status === 'pending').length === 0 && (
+                <div className="py-12 text-center border-2 border-dashed border-gray-100 rounded-3xl">
+                  <p className="text-[10px] text-gray-300 font-black uppercase tracking-widest">Nenhuma solicitação pendente.</p>
                 </div>
-              </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
 
-      {activeTab === 'requests' && (
-        <div className="space-y-6 text-left animate-in fade-in">
-          <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
-            <div className="flex items-center gap-4 border-b border-gray-100 pb-4">
-              <div className="w-12 h-12 bg-lime-50 rounded-2xl flex items-center justify-center text-lime-600">
-                <Users size={24} />
-              </div>
+      {activeTab === 'integration' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-left animate-in fade-in">
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
               <div>
-                <h2 className="text-xl font-black uppercase tracking-tighter text-gray-900">Solicitações Pendentes</h2>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Aprove o acesso à rede</p>
+                <h3 className="text-xl font-black uppercase flex items-center gap-3 tracking-tighter">
+                  <DatabaseZap className="text-lime-600" size={24} /> Supabase
+                </h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Status da Conexão</p>
+              </div>
+
+              <div className="p-4 bg-green-50 border border-green-100 rounded-2xl">
+                <p className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-2">
+                  <CheckCircle2 size={14} /> Conectado
+                </p>
+              </div>
+
+              <button
+                onClick={() => { localStorage.clear(); alert("Cache limpo!"); window.location.reload(); }}
+                className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-amber-50 rounded-2xl transition-all group"
+              >
+                <span className="text-xs font-black uppercase">Limpar Cache Local</span>
+                <RefreshCw size={16} className="text-gray-300 group-hover:rotate-180 transition-transform duration-500" />
+              </button>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-8 h-full flex flex-col">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-black uppercase flex items-center gap-3 tracking-tighter"><Activity className="text-gray-400" /> Atividade em Tempo Real</h2>
+              </div>
+
+              <div className="flex-1 bg-gray-950 rounded-[2.5rem] p-6 text-lime-400 font-mono text-[11px] space-y-2 overflow-y-auto max-h-[500px] border-8 border-white shadow-inner custom-scrollbar">
+                {systemLogs.slice(0, 50).map((log) => (
+                  <div key={log.id} className="flex gap-3 leading-relaxed opacity-70 hover:opacity-100 transition-opacity">
+                    <span className="opacity-40">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
+                    <span className="font-bold">[{log.type}]</span>
+                    <span>{log.action}: {log.details}</span>
+                  </div>
+                ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {users.filter(u => u && u.status === 'pending').map(u => (
-                <div key={u.id} className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 flex flex-col gap-6">
-                  <div>
-                    <h3 className="font-black uppercase text-sm text-gray-900">{u?.nome || 'Sem Nome'}</h3>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Username: @{u?.username}</p>
+      {activeTab === 'audit' && (
+        <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6 animate-in fade-in">
+          <h2 className="text-xl font-black uppercase flex items-center gap-3 tracking-tighter"><Terminal size={24} /> Log de Auditoria</h2>
+          <div className="overflow-x-auto rounded-3xl border border-gray-100">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="p-4 text-[9px] font-black uppercase text-gray-400">Data</th>
+                  <th className="p-4 text-[9px] font-black uppercase text-gray-400">Usuário</th>
+                  <th className="p-4 text-[9px] font-black uppercase text-gray-400">Ação</th>
+                  <th className="p-4 text-[9px] font-black uppercase text-gray-400">Detalhes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filteredLogs.map(log => (
+                  <tr key={log.id} className="text-[10px]">
+                    <td className="p-4 text-gray-400">{new Date(log.timestamp).toLocaleString()}</td>
+                    <td className="p-4 font-black">{log.user}</td>
+                    <td className="p-4 font-bold uppercase">{log.action}</td>
+                    <td className="p-4 text-gray-500">{log.details}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-                    <div className="mt-4 space-y-1">
-                      {u?.whatsapp && <p className="text-xs text-gray-500 font-medium">📱 {u.whatsapp}</p>}
-                      {u?.email && <p className="text-xs text-gray-500 font-medium">📧 {u.email}</p>}
-                      {u?.requestedAt && <p className="text-[9px] text-gray-400 font-bold uppercase mt-2">Solicitado em: {new Date(u.requestedAt).toLocaleString('pt-BR')}</p>}
-                    </div>
-                  </div>
+      {/* CRUD User Modal */}
+      {showUserModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 space-y-8 animate-in relative max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-6">
+              <h2 className="text-2xl font-black uppercase text-gray-900">{editingUser?.id ? 'Editar Usuário' : 'Novo Usuário'}</h2>
+              <button onClick={() => setShowUserModal(false)}><X size={24} /></button>
+            </div>
 
-                  <div className="flex gap-2 mt-auto">
-                    <button onClick={() => handleApproveUser(u)} className="flex-1 bg-black text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all hover:bg-gray-800">
-                      Aprovar Acesso
-                    </button>
-                    <button onClick={() => handleRejectUser(u)} className="px-4 py-3 bg-red-100 text-red-600 rounded-xl transition-all hover:bg-red-200" title="Recusar">
-                      <X size={16} strokeWidth={3} />
-                    </button>
-                  </div>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <InputField label="Nome" value={editingUser?.nome} onChange={(v: string) => setEditingUser({ ...editingUser, nome: v })} />
+                <InputField label="Username" value={editingUser?.username} onChange={(v: string) => setEditingUser({ ...editingUser, username: v })} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <InputField label="WhatsApp" value={editingUser?.whatsapp} onChange={(v: string) => setEditingUser({ ...editingUser, whatsapp: v })} />
+                <InputField label="Email" value={editingUser?.email} onChange={(v: string) => setEditingUser({ ...editingUser, email: v })} />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-gray-400">Poder de Acesso (Role)</label>
+                <div className="flex gap-2">
+                  {['Master', 'Líder', 'Discípula'].map(r => (
+                    <button key={r} onClick={() => setEditingUser({ ...editingUser, role: r })} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editingUser.role === r ? 'bg-black text-white border-black' : 'border-gray-100 text-gray-400'}`}>{r}</button>
+                  ))}
                 </div>
-              ))}
-              {users.filter(u => u && u.status === 'pending').length === 0 && (
-                <div className="col-span-full py-12 text-center border-2 border-dashed border-gray-100 rounded-3xl">
-                  <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Nenhuma solicitação pendente.</p>
-                </div>
-              )}
+              </div>
+
+              <div className="pt-6 border-t flex gap-4">
+                <button onClick={() => setShowUserModal(false)} className="flex-1 py-4 font-black text-gray-400 uppercase text-xs">Cancelar</button>
+                <button onClick={() => handleSaveUser(editingUser)} className="flex-1 py-4 bg-black text-white font-black rounded-2xl uppercase text-xs shadow-xl">Salvar Usuário</button>
+              </div>
             </div>
           </div>
         </div>
@@ -619,20 +471,25 @@ const AdminPanel: React.FC = () => {
   );
 };
 
-const StatMini = ({ label, value, icon: Icon }: any) => (
-  <div className="text-right flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
-    <div>
-      <p className="text-[8px] font-black uppercase text-gray-400 leading-none">{label}</p>
-      <p className="text-sm font-black">{value}</p>
-    </div>
-    <div className="text-gray-300"><Icon size={16} /></div>
+const InputField = ({ label, value, onChange }: any) => (
+  <div className="space-y-1.5 text-left">
+    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">{label}</label>
+    <input
+      type="text"
+      className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none text-xs focus:ring-4 focus:ring-lime-50 transition-all shadow-sm"
+      value={value || ''}
+      onChange={e => onChange(e.target.value)}
+    />
   </div>
 );
 
-const InputField = ({ label, value, onChange }: any) => (
-  <div className="space-y-1">
-    <label className="text-[10px] font-black uppercase text-gray-400 ml-1 tracking-widest">{label}</label>
-    <input type="text" className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-none text-xs focus:ring-4 focus:ring-lime-100 transition-all shadow-sm" value={value || ''} onChange={e => onChange(e.target.value)} />
+const StatMini = ({ label, value, icon: Icon }: any) => (
+  <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
+    <div className="text-right">
+      <p className="text-[8px] font-black uppercase text-gray-400 leading-none">{label}</p>
+      <p className="text-xs font-black">{value}</p>
+    </div>
+    <div className="text-gray-300"><Icon size={14} /></div>
   </div>
 );
 

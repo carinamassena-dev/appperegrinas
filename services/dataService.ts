@@ -58,7 +58,7 @@ const memoryCache: Record<string, { data: any[], timestamp: number }> = {};
 /**
  * Load data: Supabase ONLY
  */
-export async function loadData<T>(module: keyof typeof TABLES): Promise<T[]> {
+export async function loadData<T>(module: keyof typeof TABLES, forceRefresh: boolean = false): Promise<T[]> {
     const { table } = TABLES[module];
 
     if (!isSupabaseReady()) {
@@ -70,26 +70,32 @@ export async function loadData<T>(module: keyof typeof TABLES): Promise<T[]> {
 
     // 1. Check localStorage cache first (survives page refresh)
     const lsKey = `cached_${module}`;
-    const cachedItemStr = localStorage.getItem(lsKey);
-    if (cachedItemStr) {
-        try {
-            const cachedItem = JSON.parse(cachedItemStr);
-            if (now - cachedItem.timestamp < CACHE_LIFETIME) {
-                console.log(`[Cache Hit] Poupando Egress de: ${module} (via localStorage)`);
-                memoryCache[module] = cachedItem;
-                return cachedItem.data as T[];
-            } else {
+    if (!forceRefresh) {
+        const cachedItemStr = localStorage.getItem(lsKey);
+        if (cachedItemStr) {
+            try {
+                const cachedItem = JSON.parse(cachedItemStr);
+                if (now - cachedItem.timestamp < CACHE_LIFETIME) {
+                    console.log(`[Cache Hit] Poupando Egress de: ${module} (via localStorage)`);
+                    memoryCache[module] = cachedItem;
+                    return cachedItem.data as T[];
+                } else {
+                    localStorage.removeItem(lsKey);
+                }
+            } catch (e) {
                 localStorage.removeItem(lsKey);
             }
-        } catch (e) {
-            localStorage.removeItem(lsKey);
         }
-    }
 
-    // 2. Check in-memory cache
-    if (memoryCache[module] && (now - memoryCache[module].timestamp < CACHE_LIFETIME)) {
-        console.log(`[Cache Hit] Poupando Egress de: ${module}`);
-        return memoryCache[module].data as T[];
+        // 2. Check in-memory cache
+        if (memoryCache[module] && (now - memoryCache[module].timestamp < CACHE_LIFETIME)) {
+            console.log(`[Cache Hit] Poupando Egress de: ${module}`);
+            return memoryCache[module].data as T[];
+        }
+    } else {
+        console.log(`[Cache Bypass] Forçando recarregamento de: ${module}`);
+        localStorage.removeItem(lsKey);
+        delete memoryCache[module];
     }
 
     // 3. Fetch from Supabase

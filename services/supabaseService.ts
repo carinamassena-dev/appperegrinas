@@ -59,6 +59,11 @@ export const supabaseService = {
         return result;
     },
 
+    // Alias for consistency with legacy code or specific relational needs
+    async upsertRelational(table: string, item: any) {
+        return this.upsert(table, item);
+    },
+
     // Standard Select ALL with Org Filter Fallback
     async getAll(table: string) {
         if (!supabase) return [];
@@ -71,7 +76,6 @@ export const supabaseService = {
         // OR the user's current organization
         if (orgId) {
             if (table === 'usuarios' || table === 'lideres') {
-                console.log(`[Supabase] Fetching ${table} with Relaxed Org Filter: ${orgId} OR NULL`);
                 query = query.or(`organization_id.eq.${orgId},organization_id.is.null`);
             } else {
                 query = query.eq('organization_id', orgId);
@@ -82,7 +86,6 @@ export const supabaseService = {
 
         // Code 42703: Column does not exist
         if (error && error.code === '42703') {
-            console.warn(`[Supabase] Column organization_id not found in ${table}, fetching without org filter.`);
             const { data: fallback, error: err2 } = await supabase.from(table).select('*').order('id', { ascending: true });
             if (err2) throw err2;
             return (fallback || []).map((row: any) => {
@@ -95,8 +98,6 @@ export const supabaseService = {
             console.error(`[Supabase Error] Table: ${table}`, error);
             throw error;
         }
-
-        console.log(`[Supabase] Table ${table} returned ${data?.length || 0} records.`);
 
         // SMART MERGE: Combine native columns with JSONB record content
         return (data || []).map((row: any) => {
