@@ -64,16 +64,29 @@ export const supabaseService = {
         if (!supabase) return [];
 
         const orgId = getMyOrgId();
-        let query = supabase.from(table).select('id, record').order('id', { ascending: true });
-        if (orgId) query = query.eq('organization_id', orgId);
+        // Native select '*' to get all standard columns + record JSONB
+        let query = supabase.from(table).select('*').order('id', { ascending: true });
+
+        // Special handling for organization_id: include records with NO org (likely pending)
+        // OR the user's current organization
+        if (orgId) {
+            if (table === 'usuarios' || table === 'lideres') {
+                query = query.or(`organization_id.eq.${orgId},organization_id.is.null`);
+            } else {
+                query = query.eq('organization_id', orgId);
+            }
+        }
 
         const { data, error } = await query;
 
         // Code 42703: Column does not exist
         if (error && error.code === '42703') {
-            const { data: fallback, error: err2 } = await supabase.from(table).select('id, record').order('id', { ascending: true });
+            const { data: fallback, error: err2 } = await supabase.from(table).select('*').order('id', { ascending: true });
             if (err2) throw err2;
-            return (fallback || []).map((row: any) => row.record).filter(Boolean);
+            return (fallback || []).map((row: any) => {
+                const baseRecord = row.record || {};
+                return { ...row, ...baseRecord };
+            }).filter(Boolean);
         }
 
         if (error) {
@@ -81,7 +94,12 @@ export const supabaseService = {
             throw error;
         }
 
-        return (data || []).map((row: any) => row.record).filter(Boolean);
+        // SMART MERGE: Combine native columns with JSONB record content
+        return (data || []).map((row: any) => {
+            const baseRecord = row.record || {};
+            // Return a merged object where native columns (like status) are preserved
+            return { ...row, ...baseRecord };
+        }).filter(Boolean);
     },
 
     // Dedicated Backup Function (No Limits)
@@ -112,7 +130,14 @@ export const supabaseService = {
         if (!supabase) return;
         const orgId = getMyOrgId();
         let query = supabase.from(table).delete().eq('id', id);
-        if (orgId) query = query.eq('organization_id', orgId);
+
+        if (orgId) {
+            if (table === 'usuarios' || table === 'lideres') {
+                query = query.or(`organization_id.eq.${orgId},organization_id.is.null`);
+            } else {
+                query = query.eq('organization_id', orgId);
+            }
+        }
 
         const { error } = await query;
 
@@ -128,19 +153,28 @@ export const supabaseService = {
     async getById(table: string, id: string) {
         if (!supabase) return null;
         const orgId = getMyOrgId();
-        let query = supabase.from(table).select('record').eq('id', id);
-        if (orgId) query = query.eq('organization_id', orgId);
+        let query = supabase.from(table).select('*').eq('id', id);
+
+        if (orgId) {
+            if (table === 'usuarios' || table === 'lideres') {
+                query = query.or(`organization_id.eq.${orgId},organization_id.is.null`);
+            } else {
+                query = query.eq('organization_id', orgId);
+            }
+        }
 
         const { data, error } = await query;
 
         if (error && error.code === '42703') {
-            const { data: fallback, error: err2 } = await supabase.from(table).select('record').eq('id', id);
+            const { data: fallback, error: err2 } = await supabase.from(table).select('*').eq('id', id);
             if (err2) throw err2;
-            return fallback?.[0]?.record || null;
+            const row = fallback?.[0];
+            return row ? { ...row, ...(row.record || {}) } : null;
         }
 
         if (error) return null;
-        return data?.[0]?.record || null;
+        const row = data?.[0];
+        return row ? { ...row, ...(row.record || {}) } : null;
     },
 
     // Get Count Header Only (Extreme Egress Saver)
