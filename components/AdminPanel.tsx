@@ -8,12 +8,12 @@ import {
   DollarSign, Calendar, CheckCircle2, ArrowRight, Sprout, Download, Upload, AlertTriangle,
   FileText, Shield
 } from 'lucide-react';
-import { UserAccount, AuditLog, AuditLogType } from '../types';
+import { UserAccount } from '../types';
+import { AuditLog, AuditLogType, getAuditLogs, getCachedAuditLogs, logAction } from '../services/auditService';
 import { AuthContext } from '../App';
 import { supabaseService } from '../services/supabaseService';
 import { loadData, saveRecord, deleteRecord, loadDisciplesList, generateFullSystemBackup, restoreFromBackup } from '../services/dataService';
 import { useNavigate } from 'react-router-dom';
-import { getAuditLogs, getCachedAuditLogs, logAction } from '../services/auditService';
 
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
@@ -171,11 +171,11 @@ const AdminPanel: React.FC = () => {
     setUsers(prev => prev.map(u => {
       if (u.id !== id) return u;
       const currentPermissions = u.permissions || {
-        dashboard: 'none', disciples: 'none', leaders: 'none', finance: 'none', events: 'none', harvest: 'none'
+        dashboard: 'none', disciples: 'none', leaders: 'none', finance: 'none', events: 'none', harvest: 'none', master: false
       };
       return {
         ...u,
-        permissions: { ...currentPermissions, [module]: value }
+        permissions: { ...currentPermissions, [module]: value } as any
       };
     }));
   };
@@ -332,7 +332,7 @@ const AdminPanel: React.FC = () => {
                           <label className="text-[9px] font-black uppercase text-gray-400">{module.label}</label>
                           <select
                             className="w-full p-2.5 bg-gray-50 rounded-lg font-bold text-[10px] outline-none border border-transparent focus:border-black transition-all"
-                            value={u.permissions?.[module.id as keyof typeof u.permissions] || 'none'}
+                            value={(u.permissions?.[module.id as keyof typeof u.permissions] as string) || 'none'}
                             onChange={(e) => updatePermission(u.id, module.id, e.target.value)}
                           >
                             <option value="none">Bloqueado</option>
