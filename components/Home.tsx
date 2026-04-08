@@ -53,7 +53,7 @@ const Home: React.FC = () => {
         request: newPrayerText,
         prayingUsers: []
       };
-      await saveRecord('intercessions', prayer);
+      await saveRecord('intercessoes', prayer);
       setNewPrayerText('');
       setShowNewPrayerForm(false);
       await fetchPrayers();
@@ -84,7 +84,7 @@ const Home: React.FC = () => {
     }));
 
     try {
-      await saveRecord('intercessions', { ...prayer, prayingUsers: updatedUsers });
+      await saveRecord('intercessoes', { ...prayer, prayingUsers: updatedUsers });
     } catch (e) {
       console.error('Erro ao registrar oração', e);
       // Revert on error
