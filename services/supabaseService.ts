@@ -460,7 +460,17 @@ export const supabaseService = {
             .select('id, record, created_at');
 
         if (orgId) query = query.eq('organization_id', orgId);
-        const { data, error } = await query.gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false });
+        let { data, error } = await query.gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false });
+
+        // Fallback if organization_id column is missing
+        if (error && error.code === '42703') {
+            const fallbackQuery = supabase
+                .from('intercessoes')
+                .select('id, record, created_at');
+            const fallbackResult = await fallbackQuery.gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false });
+            data = fallbackResult.data;
+            error = fallbackResult.error;
+        }
 
         if (error) {
             console.error('[Supabase Error] getRecentIntercessions:', error);
@@ -469,6 +479,37 @@ export const supabaseService = {
         }
 
         // Merge created_at into the returning objects for UI sorting/display if needed
+        return (data || []).map((row: any) => ({ ...row.record, id: row.id, created_at: row.created_at }));
+    },
+
+    // Mural de Comunhão (Forum Posts) Filter
+    async getMuralPosts(orgId?: string) {
+        if (!supabase) return [];
+
+        let query = supabase
+            .from('forum_posts')
+            .select('id, record, created_at');
+
+        if (orgId) query = query.eq('organization_id', orgId);
+        let { data, error } = await query.order('created_at', { ascending: false }).limit(20);
+
+        // Fallback if organization_id column is missing
+        if (error && error.code === '42703') {
+            const fallbackQuery = supabase
+                .from('forum_posts')
+                .select('id, record, created_at')
+                .order('created_at', { ascending: false })
+                .limit(20);
+            const fallbackResult = await fallbackQuery;
+            data = fallbackResult.data;
+            error = fallbackResult.error;
+        }
+
+        if (error) {
+            console.error('[Supabase Error] getMuralPosts:', error);
+            return [];
+        }
+
         return (data || []).map((row: any) => ({ ...row.record, id: row.id, created_at: row.created_at }));
     },
 

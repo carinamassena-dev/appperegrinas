@@ -42,32 +42,19 @@ const MuralComunhao: React.FC<MuralComunhaoProps> = ({ userProfile }) => {
     }, []);
 
     const fetchPosts = async () => {
-        let query = supabase
-            .from('forum_posts')
-            .select('id, record')
-            .order('created_at', { ascending: false })
-            .limit(20);
+        const { supabaseService } = await import('../services/supabaseService');
+        const mapped = await supabaseService.getMuralPosts(userProfile.organization_id);
 
-        if (userProfile.organization_id) {
-            query = query.eq('organization_id', userProfile.organization_id);
-        }
-
-        const { data } = await query;
-        if (data) {
-            const mapped = data.map((d: any) => ({
-                id: d.id,
-                ...d.record
-            })) as ForumPost[];
-
+        if (mapped) {
             // Ordenar no cliente pelos fixados primeiro (já que extraímos do record)
-            mapped.sort((a, b) => {
+            const sorted = [...mapped].sort((a: any, b: any) => {
                 if (a.is_fixed === b.is_fixed) {
                     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
                 }
                 return a.is_fixed ? -1 : 1;
             });
 
-            setPosts(mapped);
+            setPosts(sorted as ForumPost[]);
         }
     };
 
