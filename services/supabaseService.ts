@@ -450,67 +450,65 @@ export const supabaseService = {
     async getRecentIntercessions() {
         if (!supabase) return [];
 
-        // "início do dia atual"
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
 
         const orgId = getMyOrgId();
-        let query = supabase
-            .from('intercessoes')
-            .select('id, record, created_at');
 
-        if (orgId) query = query.eq('organization_id', orgId);
-        let { data, error } = await query.gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false });
+        try {
+            // Tentativa 1: Com filtro de organização
+            let query = supabase.from('intercessoes').select('id, record, created_at');
+            if (orgId) query = query.eq('organization_id', orgId);
+            const { data, error } = await query.gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false });
 
-        // Fallback if organization_id column is missing
-        if (error && error.code === '42703') {
-            const fallbackQuery = supabase
-                .from('intercessoes')
-                .select('id, record, created_at');
-            const fallbackResult = await fallbackQuery.gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false });
-            data = fallbackResult.data;
-            error = fallbackResult.error;
-        }
+            if (!error) return (data || []).map((row: any) => ({ ...row.record, id: row.id, created_at: row.created_at }));
 
-        if (error) {
+            // Se erro for de coluna faltante (42703), tenta sem filtro
+            if (error.code === '42703') {
+                const { data: fallbackData, error: fallbackError } = await supabase
+                    .from('intercessoes')
+                    .select('id, record, created_at')
+                    .gte('created_at', startOfDay.toISOString())
+                    .order('created_at', { ascending: false });
+
+                if (!fallbackError) return (fallbackData || []).map((row: any) => ({ ...row.record, id: row.id, created_at: row.created_at }));
+            }
+
             console.error('[Supabase Error] getRecentIntercessions:', error);
-            // Non-fatal, return empty
-            return [];
+        } catch (e) {
+            console.error('[Critical Error] getRecentIntercessions:', e);
         }
-
-        // Merge created_at into the returning objects for UI sorting/display if needed
-        return (data || []).map((row: any) => ({ ...row.record, id: row.id, created_at: row.created_at }));
+        return [];
     },
 
     // Mural de Comunhão (Forum Posts) Filter
     async getMuralPosts(orgId?: string) {
         if (!supabase) return [];
 
-        let query = supabase
-            .from('forum_posts')
-            .select('id, record, created_at');
+        try {
+            // Tentativa 1: Com filtro
+            let query = supabase.from('forum_posts').select('id, record, created_at');
+            if (orgId) query = query.eq('organization_id', orgId);
+            const { data, error } = await query.order('created_at', { ascending: false }).limit(20);
 
-        if (orgId) query = query.eq('organization_id', orgId);
-        let { data, error } = await query.order('created_at', { ascending: false }).limit(20);
+            if (!error) return (data || []).map((row: any) => ({ ...row.record, id: row.id, created_at: row.created_at }));
 
-        // Fallback if organization_id column is missing
-        if (error && error.code === '42703') {
-            const fallbackQuery = supabase
-                .from('forum_posts')
-                .select('id, record, created_at')
-                .order('created_at', { ascending: false })
-                .limit(20);
-            const fallbackResult = await fallbackQuery;
-            data = fallbackResult.data;
-            error = fallbackResult.error;
-        }
+            // Tenta sem filtro se a coluna não existir
+            if (error.code === '42703') {
+                const { data: fallbackData, error: fallbackError } = await supabase
+                    .from('forum_posts')
+                    .select('id, record, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
 
-        if (error) {
+                if (!fallbackError) return (fallbackData || []).map((row: any) => ({ ...row.record, id: row.id, created_at: row.created_at }));
+            }
+
             console.error('[Supabase Error] getMuralPosts:', error);
-            return [];
+        } catch (e) {
+            console.error('[Critical Error] getMuralPosts:', e);
         }
-
-        return (data || []).map((row: any) => ({ ...row.record, id: row.id, created_at: row.created_at }));
+        return [];
     },
 
     // Specific for Finance
