@@ -348,7 +348,7 @@ const Events: React.FC = () => {
               <div className="flex justify-between items-center p-4 md:p-6 border-b shrink-0">
                 <div className="min-w-0">
                   <h2 className="text-base md:text-xl font-black uppercase truncate">{showRegModal.nome}</h2>
-                  <p className="text-[9px] font-black uppercase text-lime-600">{showRegModal.participantes.length} Inscritos • {showRegModal.capacidadeMax} vagas</p>
+                  <p className="text-[11px] font-black uppercase text-lime-600">{showRegModal.participantes.length} Inscritos • {showRegModal.capacidadeMax} vagas</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button onClick={() => exportInscritos(showRegModal)} className="p-2 text-lime-600 hover:bg-lime-50 rounded-xl"><Download size={18} /></button>
@@ -358,10 +358,10 @@ const Events: React.FC = () => {
 
               {/* Mobile Tabs */}
               <div className="flex md:hidden border-b shrink-0">
-                <button onClick={() => setPFilter('all')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${pFilter !== 'confirmed' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
+                <button onClick={() => setPFilter('all')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${pFilter !== 'confirmed' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
                   <Users size={14} className="mx-auto mb-1" /> Inscritos
                 </button>
-                <button onClick={() => setPFilter('confirmed')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${pFilter === 'confirmed' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
+                <button onClick={() => setPFilter('confirmed')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${pFilter === 'confirmed' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
                   <UserPlus size={14} className="mx-auto mb-1" /> Cadastrar
                 </button>
               </div>
@@ -372,7 +372,7 @@ const Events: React.FC = () => {
 
                   {/* Registration Form - hidden on mobile unless tab selected */}
                   <div className={`lg:col-span-1 space-y-3 ${pFilter !== 'confirmed' ? 'hidden lg:block' : ''}`}>
-                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest border-b pb-2 hidden md:block">Registrar Inscrição</h3>
+                    <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest border-b pb-2 hidden md:block">Registrar Inscrição</h3>
                     <div className="space-y-3">
                       <Input label="Nome Completo" value={newReg.nome} onChange={(v: any) => setNewReg({ ...newReg, nome: v })} />
                       <div className="grid grid-cols-2 gap-3">
@@ -387,12 +387,12 @@ const Events: React.FC = () => {
                       <button
                         onClick={handleAddRegistration}
                         disabled={!editingParticipant && showRegModal.participantes.length >= showRegModal.capacidadeMax}
-                        className={`w-full py-3 rounded-2xl shadow-lg font-black uppercase text-[10px] tracking-widest transition-all ${editingParticipant ? 'bg-black text-white' : 'bg-lime-peregrinas text-black'}`}
+                        className={`w-full py-3 rounded-2xl shadow-lg font-black uppercase text-xs tracking-widest transition-all ${editingParticipant ? 'bg-black text-white' : 'bg-lime-peregrinas text-black'}`}
                       >
                         {editingParticipant ? 'Salvar Alterações' : 'Confirmar Inscrição'}
                       </button>
                       {editingParticipant && (
-                        <button onClick={() => { setEditingParticipant(null); setNewReg({ nome: '', email: '', whatsapp: '', valorInscricao: 0, formaIdentificacao: '', tipoParticipacao: 'Participante', status: 'Confirmada' }); }} className="w-full text-[9px] font-black text-gray-400 uppercase">Cancelar Edição</button>
+                        <button onClick={() => { setEditingParticipant(null); setNewReg({ nome: '', email: '', whatsapp: '', valorInscricao: 0, formaIdentificacao: '', tipoParticipacao: 'Participante', status: 'Confirmada' }); }} className="w-full text-[11px] font-black text-gray-400 uppercase">Cancelar Edição</button>
                       )}
                     </div>
                   </div>
@@ -401,13 +401,13 @@ const Events: React.FC = () => {
                   <div className={`lg:col-span-2 space-y-3 ${pFilter === 'confirmed' ? 'hidden lg:block' : ''}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <div className="flex gap-1 flex-wrap">
-                        <button onClick={() => setPFilter('all')} className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-400'}`}>Todos</button>
-                        <button onClick={() => setPFilter('present')} className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'present' ? 'bg-lime-400 text-black' : 'bg-white text-gray-400'}`}>Presentes</button>
-                        <button onClick={() => setPFilter('absent')} className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'absent' ? 'bg-red-50 text-red-500' : 'bg-white text-gray-400'}`}>Ausentes</button>
+                        <button onClick={() => setPFilter('all')} className={`text-xs font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-400'}`}>Todos</button>
+                        <button onClick={() => setPFilter('present')} className={`text-xs font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'present' ? 'bg-lime-400 text-black' : 'bg-white text-gray-400'}`}>Presentes</button>
+                        <button onClick={() => setPFilter('absent')} className={`text-xs font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'absent' ? 'bg-red-50 text-red-500' : 'bg-white text-gray-400'}`}>Ausentes</button>
                       </div>
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
-                        <input type="text" placeholder="Pesquisar..." className="pl-8 pr-3 py-2 bg-gray-50 rounded-xl text-[10px] font-bold outline-none w-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                        <input type="text" placeholder="Pesquisar..." className="pl-8 pr-3 py-2 bg-gray-50 rounded-xl text-xs font-bold outline-none w-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                       </div>
                     </div>
 
@@ -418,15 +418,15 @@ const Events: React.FC = () => {
                             <div className="flex items-center gap-3 min-w-0">
                               <button
                                 onClick={() => togglePresence(showRegModal.id, p.id)}
-                                className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-xs border transition-all ${(p as any).presente ? 'bg-lime-400 text-black border-lime-500' : 'bg-white text-gray-300 border-gray-200'}`}
+                                className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-sm border transition-all ${(p as any).presente ? 'bg-lime-400 text-black border-lime-500' : 'bg-white text-gray-300 border-gray-200'}`}
                               >
                                 {(p as any).presente ? <Check size={14} /> : p.nome.charAt(0)}
                               </button>
                               <div className="min-w-0">
-                                <p className="text-xs font-black text-gray-900 truncate">{p.nome}</p>
+                                <p className="text-sm font-black text-gray-900 truncate">{p.nome}</p>
                                 <div className="flex items-center gap-1 mt-0.5">
-                                  <span className={`text-[7px] font-black uppercase px-1 py-0.5 rounded ${p.status === 'Confirmada' ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-500'}`}>{p.status}</span>
-                                  <span className="text-[7px] font-black text-gray-400 uppercase">{p.tipoParticipacao}</span>
+                                  <span className={`text-[10px] font-black uppercase px-1 py-0.5 rounded ${p.status === 'Confirmada' ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-500'}`}>{p.status}</span>
+                                  <span className="text-[10px] font-black text-gray-400 uppercase">{p.tipoParticipacao}</span>
                                 </div>
                               </div>
                             </div>
@@ -439,7 +439,7 @@ const Events: React.FC = () => {
                           </div>
                         </div>
                       ))}
-                      {filteredParticipants.length === 0 && <p className="text-center py-12 text-gray-300 font-black uppercase text-[9px] tracking-widest">Nenhuma inscrição encontrada</p>}
+                      {filteredParticipants.length === 0 && <p className="text-center py-12 text-gray-300 font-black uppercase text-[11px] tracking-widest">Nenhuma inscrição encontrada</p>}
                     </div>
                   </div>
 
