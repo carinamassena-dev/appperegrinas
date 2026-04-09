@@ -16,6 +16,8 @@ const Events: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pFilter, setPFilter] = useState<'all' | 'present' | 'absent' | 'confirmed' | 'pending'>('all');
+  const [showTicket, setShowTicket] = useState<Participant | null>(null);
   const { user } = useContext(AuthContext)!;
 
   const initialEvent: Partial<Event> = {
@@ -155,7 +157,7 @@ const Events: React.FC = () => {
   };
 
   const handleAddRegistration = async () => {
-    if (!showRegModal || !newReg.nome || !newReg.email) return;
+    if (!showRegModal || !newReg.nome) return alert("Pelo menos o Nome é obrigatório!");
     if (!editingParticipant && showRegModal.participantes.length >= showRegModal.capacidadeMax) return alert("CAPACIDADE MÁXIMA ATINGIDA!");
 
     const participant: Participant = editingParticipant
@@ -239,11 +241,26 @@ const Events: React.FC = () => {
     } catch { return; }
   };
 
-  const filteredParticipants = showRegModal?.participantes.filter(p =>
-    p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.id.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredParticipants = showRegModal?.participantes.filter(p => {
+    const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.id.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    if (pFilter === 'present') return (p as any).presente;
+    if (pFilter === 'absent') return !(p as any).presente;
+    if (pFilter === 'confirmed') return p.status === 'Confirmada';
+    if (pFilter === 'pending') return p.status === 'Pendente';
+
+    return true;
+  }) || [];
+
+  const handleShareWhatsApp = (p: Participant, event: Event) => {
+    const msg = `Olá ${p.nome}! Aqui está seu ingresso para o evento *${event.nome}*.\n\n📍 Local: ${event.local}\n📅 Data: ${event.dataInicio}\n🕒 Horário: ${event.horario}\n🎟️ Token: ${p.id}\n\nVeja seu QR Code aqui: https://api.qrserver.com/v1/create-qr-code/?data=${p.id}&size=300x300`;
+    const url = `https://wa.me/${p.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
 
   if (isLoading) {
     return (
@@ -320,93 +337,116 @@ const Events: React.FC = () => {
         )}
       </div>
 
-      {showRegModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-6xl rounded-[3rem] p-10 space-y-8 animate-in flex flex-col max-h-[95vh]">
-            <div className="flex justify-between items-center border-b pb-6 sticky top-0 bg-white z-10">
-              <div>
-                <h2 className="text-2xl font-black uppercase">{showRegModal.nome}</h2>
-                <p className="text-[10px] font-black uppercase text-lime-600">Gestão de Bilheteria • {showRegModal.participantes.length} Inscritos</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <button onClick={() => exportInscritos(showRegModal)} className="text-[9px] font-black uppercase text-lime-600 flex items-center gap-2 border border-lime-200 px-4 py-2 rounded-xl hover:bg-lime-50 transition-all"><Download size={14} /> Exportar CSV</button>
-                <button onClick={() => setShowRegModal(null)}><X size={24} /></button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 overflow-y-auto custom-scrollbar pr-4">
-              <div className="lg:col-span-1 space-y-6">
-                <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest border-b pb-2">Registrar Inscrição</h3>
-                <div className="space-y-4">
-                  <Input label="Nome Completo" value={newReg.nome} onChange={(v: any) => setNewReg({ ...newReg, nome: v })} />
-                  <Input label="E-mail" type="email" value={newReg.email} onChange={(v: any) => setNewReg({ ...newReg, email: v })} />
-                  <Input label="WhatsApp" value={newReg.whatsapp} onChange={(v: any) => setNewReg({ ...newReg, whatsapp: v })} />
-                  <div className="grid grid-cols-2 gap-4">
-                    <Select label="Participação" value={newReg.tipoParticipacao} options={['Participante', 'Voluntário', 'Palestrante', 'Equipe']} onChange={(v: any) => setNewReg({ ...newReg, tipoParticipacao: v as any })} />
-                    <Select label="Status" value={newReg.status} options={['Confirmada', 'Pendente', 'Cancelada']} onChange={(v: any) => setNewReg({ ...newReg, status: v as any })} />
-                  </div>
-                  <Input label="Forma de Identificação (RG/CPF)" value={newReg.formaIdentificacao} onChange={(v: any) => setNewReg({ ...newReg, formaIdentificacao: v })} />
-                  <Input label="Valor da Inscrição (R$)" type="number" value={newReg.valorInscricao} onChange={(v: any) => setNewReg({ ...newReg, valorInscricao: parseFloat(v) })} />
-                  <button
-                    onClick={handleAddRegistration}
-                    disabled={!editingParticipant && showRegModal.participantes.length >= showRegModal.capacidadeMax}
-                    className={`w-full py-4 rounded-2xl shadow-xl font-black uppercase text-xs tracking-widest transition-all ${editingParticipant ? 'bg-black text-white' : 'bg-lime-peregrinas text-black'}`}
-                  >
-                    {editingParticipant ? 'Salvar Alterações' : 'Confirmar & Gerar QR'}
-                  </button>
-                  {editingParticipant && (
-                    <button onClick={() => { setEditingParticipant(null); setNewReg({ nome: '', email: '', whatsapp: '', valorInscricao: 0, formaIdentificacao: '', tipoParticipacao: 'Participante', status: 'Confirmada' }); }} className="w-full text-[9px] font-black text-gray-400 uppercase">Cancelar Edição</button>
-                  )}
+      {showRegModal && (() => {
+        const [mobileTab, setMobileTab] = [pFilter === 'all' || pFilter === 'present' || pFilter === 'absent' ? 'list' as const : 'form' as const, (v: string) => { }];
+        return (
+          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-md">
+            <div className="bg-white w-full md:max-w-6xl rounded-t-3xl md:rounded-[2rem] flex flex-col" style={{ maxHeight: '95vh' }}>
+              {/* Header */}
+              <div className="flex justify-between items-center p-4 md:p-6 border-b shrink-0">
+                <div className="min-w-0">
+                  <h2 className="text-base md:text-xl font-black uppercase truncate">{showRegModal.nome}</h2>
+                  <p className="text-[9px] font-black uppercase text-lime-600">{showRegModal.participantes.length} Inscritos • {showRegModal.capacidadeMax} vagas</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => exportInscritos(showRegModal)} className="p-2 text-lime-600 hover:bg-lime-50 rounded-xl"><Download size={18} /></button>
+                  <button onClick={() => setShowRegModal(null)} className="p-2 text-gray-400 hover:text-black"><X size={20} /></button>
                 </div>
               </div>
 
-              <div className="lg:col-span-2 space-y-6">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Lista de Participantes</h3>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
-                    <input type="text" placeholder="Pesquisar..." className="pl-9 pr-4 py-2 bg-gray-50 rounded-xl text-[10px] font-bold outline-none w-48" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-3">
-                  {filteredParticipants.map(p => (
-                    <div key={p.id} className="p-5 bg-gray-50 rounded-2xl flex items-center justify-between group hover:bg-white border hover:border-lime-200 transition-all">
-                      <div className="flex items-center gap-4">
-                        <button
-                          onClick={() => togglePresence(showRegModal.id, p.id)}
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs shadow-sm border transition-all ${(p as any).presente ? 'bg-black text-white' : 'bg-white text-gray-300'}`}
-                        >
-                          {(p as any).presente ? <Check size={18} /> : p.nome.charAt(0)}
-                        </button>
-                        <div>
-                          <p className="text-sm font-black text-gray-900">{p.nome}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${p.status === 'Confirmada' ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-500'}`}>{p.status}</span>
-                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{p.tipoParticipacao}</span>
-                            {(p as any).presente && <span className="text-[8px] font-black bg-lime-400 text-black px-1.5 py-0.5 rounded uppercase flex items-center gap-1"><Clock size={8} /> Presente</span>}
-                          </div>
-                        </div>
+              {/* Mobile Tabs */}
+              <div className="flex md:hidden border-b shrink-0">
+                <button onClick={() => setPFilter('all')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${pFilter !== 'confirmed' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
+                  <Users size={14} className="mx-auto mb-1" /> Inscritos
+                </button>
+                <button onClick={() => setPFilter('confirmed')} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${pFilter === 'confirmed' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
+                  <UserPlus size={14} className="mx-auto mb-1" /> Cadastrar
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 md:gap-6 p-4 md:p-6">
+
+                  {/* Registration Form - hidden on mobile unless tab selected */}
+                  <div className={`lg:col-span-1 space-y-3 ${pFilter !== 'confirmed' ? 'hidden lg:block' : ''}`}>
+                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest border-b pb-2 hidden md:block">Registrar Inscrição</h3>
+                    <div className="space-y-3">
+                      <Input label="Nome Completo" value={newReg.nome} onChange={(v: any) => setNewReg({ ...newReg, nome: v })} />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input label="E-mail" type="email" value={newReg.email} onChange={(v: any) => setNewReg({ ...newReg, email: v })} />
+                        <Input label="WhatsApp" value={newReg.whatsapp} onChange={(v: any) => setNewReg({ ...newReg, whatsapp: v })} />
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="hidden md:block text-right">
-                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">ID: {p.id}</p>
-                          <p className="text-[8px] text-gray-300 font-bold">{new Date(p.dataInscricao).toLocaleDateString()}</p>
-                        </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => { setEditingParticipant(p); setNewReg(p); }} className="p-2 text-gray-400 hover:text-black"><Edit2 size={16} /></button>
-                          <button onClick={() => handleDeleteParticipant(showRegModal.id, p.id)} className="p-2 text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
-                        </div>
-                        <QrCode className={`transition-colors ${(p as any).presente ? 'text-black' : 'text-gray-200'}`} size={28} />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Select label="Participação" value={newReg.tipoParticipacao} options={['Participante', 'Voluntário', 'Palestrante', 'Equipe']} onChange={(v: any) => setNewReg({ ...newReg, tipoParticipacao: v as any })} />
+                        <Select label="Status" value={newReg.status} options={['Confirmada', 'Pendente', 'Cancelada']} onChange={(v: any) => setNewReg({ ...newReg, status: v as any })} />
+                      </div>
+                      <Input label="Valor (R$)" type="number" value={newReg.valorInscricao} onChange={(v: any) => setNewReg({ ...newReg, valorInscricao: parseFloat(v) })} />
+                      <button
+                        onClick={handleAddRegistration}
+                        disabled={!editingParticipant && showRegModal.participantes.length >= showRegModal.capacidadeMax}
+                        className={`w-full py-3 rounded-2xl shadow-lg font-black uppercase text-[10px] tracking-widest transition-all ${editingParticipant ? 'bg-black text-white' : 'bg-lime-peregrinas text-black'}`}
+                      >
+                        {editingParticipant ? 'Salvar Alterações' : 'Confirmar Inscrição'}
+                      </button>
+                      {editingParticipant && (
+                        <button onClick={() => { setEditingParticipant(null); setNewReg({ nome: '', email: '', whatsapp: '', valorInscricao: 0, formaIdentificacao: '', tipoParticipacao: 'Participante', status: 'Confirmada' }); }} className="w-full text-[9px] font-black text-gray-400 uppercase">Cancelar Edição</button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Participant List - hidden on mobile when form tab is active */}
+                  <div className={`lg:col-span-2 space-y-3 ${pFilter === 'confirmed' ? 'hidden lg:block' : ''}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex gap-1 flex-wrap">
+                        <button onClick={() => setPFilter('all')} className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-400'}`}>Todos</button>
+                        <button onClick={() => setPFilter('present')} className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'present' ? 'bg-lime-400 text-black' : 'bg-white text-gray-400'}`}>Presentes</button>
+                        <button onClick={() => setPFilter('absent')} className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'absent' ? 'bg-red-50 text-red-500' : 'bg-white text-gray-400'}`}>Ausentes</button>
+                      </div>
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
+                        <input type="text" placeholder="Pesquisar..." className="pl-8 pr-3 py-2 bg-gray-50 rounded-xl text-[10px] font-bold outline-none w-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                       </div>
                     </div>
-                  ))}
-                  {filteredParticipants.length === 0 && <p className="text-center py-20 text-gray-300 font-black uppercase text-[10px] tracking-widest">Nenhuma inscrição encontrada</p>}
+
+                    <div className="space-y-2">
+                      {filteredParticipants.map(p => (
+                        <div key={p.id} className="p-3 md:p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <button
+                                onClick={() => togglePresence(showRegModal.id, p.id)}
+                                className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-xs border transition-all ${(p as any).presente ? 'bg-lime-400 text-black border-lime-500' : 'bg-white text-gray-300 border-gray-200'}`}
+                              >
+                                {(p as any).presente ? <Check size={14} /> : p.nome.charAt(0)}
+                              </button>
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-gray-900 truncate">{p.nome}</p>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <span className={`text-[7px] font-black uppercase px-1 py-0.5 rounded ${p.status === 'Confirmada' ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-500'}`}>{p.status}</span>
+                                  <span className="text-[7px] font-black text-gray-400 uppercase">{p.tipoParticipacao}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button onClick={() => setShowTicket(p)} className="p-1.5 bg-lime-100 text-lime-700 rounded-lg hover:bg-lime-200 transition-all" title="Ingresso"><QrCode size={14} /></button>
+                              <button onClick={() => handleShareWhatsApp(p, showRegModal)} className="p-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all" title="WhatsApp"><Phone size={14} /></button>
+                              <button onClick={() => { setEditingParticipant(p); setNewReg(p); setPFilter('confirmed'); }} className="p-1.5 text-gray-400 hover:text-black rounded-lg" title="Editar"><Edit2 size={14} /></button>
+                              <button onClick={() => handleDeleteParticipant(showRegModal.id, p.id)} className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg" title="Excluir"><Trash2 size={14} /></button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredParticipants.length === 0 && <p className="text-center py-12 text-gray-300 font-black uppercase text-[9px] tracking-widest">Nenhuma inscrição encontrada</p>}
+                    </div>
+                  </div>
+
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
@@ -466,6 +506,48 @@ const Events: React.FC = () => {
                   // Do nothing, UI rollback handled by user retrying manually
                 }
               }} className="flex-1 py-4 bg-lime-peregrinas text-black font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest">{newEvent.id ? 'SALVAR ALTERAÇÕES' : 'CRIAR EVENTO AGORA'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTicket && showRegModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-lime-400 p-8 text-center space-y-2 relative">
+              <button onClick={() => setShowTicket(null)} className="absolute top-4 right-4 text-black/50 hover:text-black"><X size={20} /></button>
+              <div className="w-16 h-1 w-8 mx-auto bg-black/10 rounded-full mb-4"></div>
+              <h2 className="text-xl font-black uppercase text-black leading-tight">{showRegModal.nome}</h2>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-black/60">Ingresso Digital</p>
+            </div>
+            <div className="p-8 space-y-8">
+              <div className="flex justify-center bg-white p-4 rounded-3xl border-2 border-dashed border-gray-100">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?data=${showTicket.id}&size=200x200`}
+                  alt="QR Code"
+                  className="w-48 h-48"
+                />
+              </div>
+              <div className="space-y-4">
+                <div className="text-center">
+                  <p className="text-lg font-black text-gray-900">{showTicket.nome}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{showTicket.tipoParticipacao} • {showTicket.id}</p>
+                </div>
+                <div className="pt-4 space-y-3">
+                  <button
+                    onClick={() => handleShareWhatsApp(showTicket, showRegModal)}
+                    className="w-full py-4 bg-[#25D366] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg"
+                  >
+                    <Phone size={14} /> Enviar p/ WhatsApp
+                  </button>
+                  <button onClick={() => window.print()} className="w-full py-4 bg-gray-100 text-gray-600 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-200 transition-all">
+                    <Download size={14} /> Baixar Ingresso
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 p-4 text-center">
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Apresente este QR Code na entrada do evento</p>
             </div>
           </div>
         </div>
