@@ -48,7 +48,7 @@ const Home: React.FC = () => {
     setIsSavingPrayer(true);
     try {
       const prayer = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         name: user.nome || 'Peregrina',
         request: newPrayerText,
         prayingUsers: []

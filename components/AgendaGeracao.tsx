@@ -176,7 +176,8 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
                 ))}
 
                 {diasNoMes.map((dia) => {
-                    const eventosDoDia = eventosFiltrados.filter((ev) => isSameDay(new Date(ev.data), dia));
+                    const dataStr = format(dia, 'yyyy-MM-dd');
+                    const eventosDoDia = eventosFiltrados.filter((ev) => ev.data === dataStr);
                     const ehHoje = isSameDay(dia, new Date());
 
                     return (
