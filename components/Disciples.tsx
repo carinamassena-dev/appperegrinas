@@ -781,8 +781,9 @@ const Disciples: React.FC = () => {
                       <Folder className="text-lime-600" size={24} fill="currentColor" />
                     </div>
                     <div>
-                      <h2 className="text-sm font-black uppercase text-gray-900 tracking-widest line-clamp-1">
-                        LÍDER DIRETA: {leader}
+                      <p className="text-[9px] font-black uppercase text-lime-600 tracking-widest mb-0.5">Lider Direta</p>
+                      <h2 className="text-sm font-black uppercase text-gray-900 tracking-tighter">
+                        {leader}
                       </h2>
                       <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">{groupedByLeader[leader].length} Ovelha(s)</p>
                     </div>

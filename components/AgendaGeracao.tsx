@@ -33,7 +33,7 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
     const [selectedEvent, setSelectedEvent] = useState<AgendaEvento | null>(null);
 
     // Form States
-    const [formData, setFormData] = useState({ titulo: '', horario: '19:00', local: '', descricao: '' });
+    const [formData, setFormData] = useState({ titulo: '', data: '', horario: '19:00', local: '', descricao: '' });
 
     useEffect(() => {
         fetchEventos();
@@ -63,7 +63,8 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
 
     const openCreateModal = (dia: Date) => {
         setSelectedDate(dia);
-        setFormData({ titulo: '', horario: '19:00', local: 'Sede / A Definir', descricao: '' });
+        const dataStr = format(dia, 'yyyy-MM-dd');
+        setFormData({ titulo: '', data: dataStr, horario: '19:00', local: 'Sede / A Definir', descricao: '' });
         setModalMode('create');
     };
 
@@ -76,6 +77,7 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
         if (!selectedEvent) return;
         setFormData({
             titulo: selectedEvent.titulo,
+            data: selectedEvent.data,
             horario: selectedEvent.horario || '19:00',
             local: selectedEvent.local || '',
             descricao: selectedEvent.descricao || ''
@@ -88,7 +90,7 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
         const { saveRecord } = await import('../services/dataService');
 
         try {
-            const dataIso = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : (selectedEvent?.data || new Date().toISOString());
+            const dataIso = formData.data || (selectedDate ? format(selectedDate, 'yyyy-MM-dd') : (selectedEvent?.data || new Date().toISOString()));
             const evId = modalMode === 'edit' && selectedEvent ? selectedEvent.id : crypto.randomUUID();
 
             const fullEventStruct = {
@@ -168,6 +170,11 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
 
             {/* Grade do Calendário */}
             <div className="grid grid-cols-7 gap-2 p-4 pt-0">
+                {/* Dias vazios para alinhar o início do mês */}
+                {Array.from({ length: startOfMonth(mesAtual).getDay() }).map((_, i) => (
+                    <div key={`empty-${i}`} className="min-h-[90px] p-1.5 rounded-2xl border border-transparent bg-gray-50/30 opacity-20" />
+                ))}
+
                 {diasNoMes.map((dia) => {
                     const eventosDoDia = eventosFiltrados.filter((ev) => isSameDay(new Date(ev.data), dia));
                     const ehHoje = isSameDay(dia, new Date());
@@ -273,6 +280,17 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
                                         className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-bold focus:border-black outline-none"
                                         placeholder="Ex: Reunião Célula"
                                     />
+                                </div>
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase text-gray-500 tracking-widest mb-1">Data do Evento</label>
+                                        <input
+                                            type="date"
+                                            value={formData.data}
+                                            onChange={e => setFormData({ ...formData, data: e.target.value })}
+                                            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-bold focus:border-black outline-none"
+                                        />
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>

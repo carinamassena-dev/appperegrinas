@@ -14,7 +14,8 @@ const Birthdays: React.FC = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const list = await loadDisciplesList();
+                // Fetch all disciples for the annual calendar (bypassing the 20-disciple limit)
+                const list = await loadDisciplesList(0, 1000, '', true);
                 setDisciples(list);
             } catch (err) {
                 console.error("Erro ao buscar dados:", err);
