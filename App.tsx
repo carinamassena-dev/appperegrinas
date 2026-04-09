@@ -541,7 +541,7 @@ const App: React.FC = () => {
                       <BottomNavItem to="/" icon={HomeIcon} label="Início" />
                       <BottomNavItem to="/discipulas" icon={Users} label="Rede" />
                       <BottomNavItem to="/financeiro" icon={DollarSign} label="Caixa" />
-                      <BottomNavItem to="/eventos" icon={Calendar} label="Agenda" />
+                      <BottomNavItem to="/eventos" icon={Calendar} Eventos" />
                       <button onClick={() => setIsSidebarOpen(true)} className="flex flex-col items-center justify-center flex-1 py-2 text-gray-400">
                         <div className="p-2">
                           <MoreHorizontal size={20} />
