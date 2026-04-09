@@ -533,7 +533,7 @@ const Disciples: React.FC = () => {
     try {
       // Re-fetch everything for export to bypass pagination limits
       const { supabaseService } = await import('../services/supabaseService');
-      const allData = await supabaseService.getAll('peregrinas');
+      const allData = await supabaseService.getDisciplesGlobalLightweight();
 
       const data = allData.map(d => ({
         'Nome': d.nome || '',
@@ -563,7 +563,7 @@ const Disciples: React.FC = () => {
     }
     try {
       const { supabaseService } = await import('../services/supabaseService');
-      const allData = await supabaseService.getAll('peregrinas');
+      const allData = await supabaseService.getDisciplesGlobalLightweight();
 
       const doc = new jsPDF();
       doc.text("Relatório de Peregrinas", 14, 15);

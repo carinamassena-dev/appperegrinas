@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useContext } from 'react';
 import {
   Users, ShieldCheck, Database, Save,
@@ -6,7 +5,7 @@ import {
   RefreshCw, X, Terminal, Loader2,
   Activity, Sparkles, DatabaseZap, Link as LinkIcon,
   DollarSign, Calendar, CheckCircle2, ArrowRight, Sprout, Download, Upload, AlertTriangle,
-  FileText, Shield
+  FileText, Shield, Wrench, Trash
 } from 'lucide-react';
 import { UserAccount } from '../types';
 import { AuditLog, AuditLogType, getAuditLogs, getCachedAuditLogs, logAction } from '../services/auditService';
@@ -18,7 +17,7 @@ import { useNavigate } from 'react-router-dom';
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useContext(AuthContext);
-  const [activeTab, setActiveTab] = useState<'users' | 'requests' | 'integration' | 'audit'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'requests' | 'integration' | 'audit' | 'maintenance'>('users');
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
@@ -212,7 +211,8 @@ const AdminPanel: React.FC = () => {
             { id: 'users', label: 'Acessos', icon: <Shield size={14} /> },
             { id: 'requests', label: 'Solicitações', badge: users.filter(u => u?.status === 'pending').length, icon: <Users size={14} /> },
             { id: 'integration', label: 'Integração', icon: <Database size={14} /> },
-            { id: 'audit', label: 'Auditoria', icon: <FileText size={14} /> }
+            { id: 'audit', label: 'Auditoria', icon: <FileText size={14} /> },
+            { id: 'maintenance', label: 'Manutenção', icon: <Wrench size={14} /> }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -462,6 +462,77 @@ const AdminPanel: React.FC = () => {
               <div className="pt-6 border-t flex gap-4">
                 <button onClick={() => setShowUserModal(false)} className="flex-1 py-4 font-black text-gray-400 uppercase text-xs">Cancelar</button>
                 <button onClick={() => handleSaveUser(editingUser)} className="flex-1 py-4 bg-black text-white font-black rounded-2xl uppercase text-xs shadow-xl">Salvar Usuário</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'maintenance' && (
+        <div className="space-y-8 text-left animate-in fade-in">
+          <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-8">
+            <div className="flex items-center gap-4 border-b border-gray-100 pb-6">
+              <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600">
+                <Wrench size={28} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black uppercase tracking-tighter text-gray-900">Manutenção de Dados</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Otimize o tamanho do banco de dados</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="p-8 bg-gray-50 rounded-[2rem] border border-gray-100 space-y-6">
+                <div className="flex items-center gap-3">
+                  <FileText className="text-gray-400" size={20} />
+                  <h3 className="font-black uppercase text-sm text-gray-900">Logs de Auditoria</h3>
+                </div>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Remova registros de auditoria com mais de 7 dias para liberar espaço no banco de dados.
+                  Esta ação é permanente e não pode ser desfeita.
+                </p>
+                <button
+                  onClick={async () => {
+                    if (!confirm('Deseja realmente remover os logs com mais de 7 dias?')) return;
+                    setIsLoading(true);
+                    try {
+                      await supabaseService.cleanupAuditLogs();
+                      alert('Limpeza concluída com sucesso!');
+                      fetchData(true);
+                    } catch (e) {
+                      alert('Erro ao limpar logs. Tente novamente.');
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                  className="w-full bg-amber-100 text-amber-700 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center gap-2"
+                >
+                  <Trash size={14} /> Limpar Logs Antigos
+                </button>
+              </div>
+
+              <div className="p-8 bg-blue-50/30 rounded-[2rem] border border-blue-100 space-y-6">
+                <div className="flex items-center gap-3">
+                  <Database className="text-blue-600" size={20} />
+                  <h3 className="font-black uppercase text-sm text-gray-900">Otimização de Egress</h3>
+                </div>
+                <p className="text-xs text-gray-600 font-medium leading-relaxed">
+                  As fotos agora são carregadas sob demanda. Listagens globais (Pastas/Aniversários) não consomem mais dados de imagens Base64, reduzindo drasticamente o Egress.
+                </p>
+                <div className="bg-white/80 p-4 rounded-xl border border-blue-100 flex items-center gap-3">
+                  <CheckCircle2 size={18} className="text-green-500" />
+                  <span className="text-[10px] font-black uppercase text-blue-800">Modo de baixo consumo ativo</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-red-50 rounded-2xl border border-red-100 flex gap-4">
+              <AlertTriangle className="text-red-500 shrink-0" size={20} />
+              <div>
+                <h4 className="text-[10px] font-black uppercase text-red-900 mb-1">Dica de Sustentabilidade</h4>
+                <p className="text-xs text-red-700 font-medium leading-relaxed">
+                  Evite fazer backups completos do sistema no final do mês caso o seu limite de Egress esteja próximo de 5GB.
+                </p>
               </div>
             </div>
           </div>

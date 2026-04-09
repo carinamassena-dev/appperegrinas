@@ -156,8 +156,8 @@ export async function loadDisciplesList(page: number = 0, limit: number = 20, se
         console.log(`[Data Fetch] Carregando ${cacheKey} do banco...`);
         let data;
         if (global) {
-            data = await supabaseService.getAll('peregrinas');
-            // getAll already extracts .record from each row, no need to map again
+            // USES LIGHTWEIGHT FETCH (No photos) to save Egress
+            data = await supabaseService.getDisciplesGlobalLightweight();
         } else {
             data = await supabaseService.getDisciplesList(page, limit, searchTerm);
         }

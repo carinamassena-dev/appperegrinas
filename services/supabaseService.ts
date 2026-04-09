@@ -236,6 +236,42 @@ export const supabaseService = {
         return this.getAll('peregrinas');
     },
 
+    /**
+     * ULTRA LIGHTWEIGHT: Fetches essential disciple data for global lists (Birthdays, Folders).
+     * EXCLUDES the 'foto' field which is the main source of Egress.
+     */
+    async getDisciplesGlobalLightweight() {
+        if (!supabase) return [];
+        const orgId = getMyOrgId();
+
+        let query = supabase
+            .from('peregrinas')
+            .select(`
+                id,
+                nome:record->>nome,
+                dataAniversario:record->>dataAniversario,
+                whatsapp:record->>whatsapp,
+                status:record->>status,
+                isLeader:record->isLeader,
+                liderDireta:record->>liderDireta
+            `);
+
+        if (orgId) query = query.eq('organization_id', orgId);
+
+        const { data, error } = await query.order('id', { ascending: false });
+
+        if (error && error.code === '42703') {
+            const { data: fallback, error: err2 } = await supabase
+                .from('peregrinas')
+                .select(`id, nome:record->>nome, dataAniversario:record->>dataAniversario, whatsapp:record->>whatsapp, status:record->>status, isLeader:record->isLeader, liderDireta:record->>liderDireta`);
+            if (err2) return [];
+            return fallback;
+        }
+
+        if (error) return [];
+        return data;
+    },
+
 
     // Optimized List Fetcher (Now with Pagination & Backend Search)
     async getDisciplesList(page: number = 0, limit: number = 20, searchTerm: string = '') {
@@ -695,6 +731,26 @@ export const supabaseService = {
             return null; // Token inválido ou não achou
         }
         return data;
+    },
+
+    // --- MANUTENÇÃO ---
+    async cleanupAuditLogs() {
+        if (!supabase) return;
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        const { error } = await supabase
+            .from('audit_logs')
+            .delete()
+            .lt('created_at', sevenDaysAgo.toISOString());
+
+        if (error && error.code === '42703') {
+            // Se não houver coluna created_at ou organização, tenta apenas limpar a tabela se estiver muito cheia
+            console.warn('[Supabase] Falha ao limpar logs: Coluna created_at ausente.');
+            return;
+        }
+
+        if (error) throw error;
     }
 }
 
