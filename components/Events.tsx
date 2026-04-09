@@ -326,7 +326,10 @@ const Events: React.FC = () => {
               </div>
             </div>
 
-            <button onClick={() => setShowRegModal(event)} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg">Gerenciar Inscritos</button>
+            <div className="flex gap-3">
+              <button onClick={() => setShowRegModal(event)} className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg">Gerenciar Inscritos</button>
+              <button onClick={() => { window.location.hash = `/checkin?checkin=${event.id}`; }} className="py-4 px-5 bg-lime-peregrinas text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all shadow-lg flex items-center gap-1"><QrCode size={14} /> Check-in</button>
+            </div>
           </div>
         ))}
         {events.length === 0 && (
