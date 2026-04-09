@@ -53,7 +53,7 @@ const Home: React.FC = () => {
         request: newPrayerText,
         prayingUsers: []
       };
-      await saveRecord('intercessoes', prayer);
+      await saveRecord('intercessions', prayer);
       setNewPrayerText('');
       setShowNewPrayerForm(false);
       await fetchPrayers();
