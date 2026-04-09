@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Trash2, Edit2, UserPlus, Search, QrCode, Mail, CheckCircle2, Loader2, AlertTriangle, Download, Clock, MapPin, Tag, Users, Info, Calendar, Phone, Table, Check, LogOut, FileText } from 'lucide-react';
+import { Plus, X, Trash2, Edit2, UserPlus, Search, QrCode, Mail, CheckCircle2, Loader2, AlertTriangle, Download, Clock, MapPin, Tag, Users, Info, Calendar, Phone, Table, Check, LogOut, FileText, MoreHorizontal } from 'lucide-react';
 import { Event, Participant, EventCategory, EventStatus, EventType, ParticipantStatus, ParticipationType } from '../types';
 import { logAction } from '../services/auditService';
 import { AuthContext } from '../App';
@@ -40,6 +39,7 @@ const Events: React.FC = () => {
     nome: '', email: '', whatsapp: '', valorInscricao: 0,
     formaIdentificacao: '', tipoParticipacao: 'Participante', status: 'Confirmada'
   });
+
   useEffect(() => {
     const loadEvents = async () => {
       try {
@@ -54,7 +54,6 @@ const Events: React.FC = () => {
     loadEvents();
   }, []);
 
-  // Load draft on mount for new events
   useEffect(() => {
     if (!showModal) {
       const draft = draftService.getDraft('events');
@@ -64,7 +63,6 @@ const Events: React.FC = () => {
     }
   }, [showModal]);
 
-  // Save to draft when typing
   useEffect(() => {
     if (showModal && !newEvent.id && newEvent.nome !== undefined && newEvent.nome.trim() !== '') {
       draftService.saveDraft('events', newEvent);
@@ -185,7 +183,7 @@ const Events: React.FC = () => {
       await saveEvents(updated, targetedEvent);
       logAction(user?.nome || 'Operador', editingParticipant ? "Participante Editado" : "Nova Inscrição", `${participant.nome} - Evento: ${showRegModal.nome}`, "EVENTO");
     } catch (err) {
-      return; // Error already warned in saveEvents
+      return;
     }
 
     if (!editingParticipant) {
@@ -264,7 +262,7 @@ const Events: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-in fade-in duration-500">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
         <Loader2 className="w-12 h-12 text-lime-500 animate-spin" />
         <p className="text-gray-400 font-bold uppercase tracking-widest text-sm">Carregando Eventos...</p>
       </div>
@@ -272,7 +270,7 @@ const Events: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8 animate-in">
+    <div className="space-y-8 animate-in pb-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black uppercase">Eventos & Inscrições</h1>
@@ -299,8 +297,8 @@ const Events: React.FC = () => {
                 <span className="text-[10px] font-black uppercase text-gray-400">{event.categoria} • {event.tipo}</span>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => { setNewEvent(event); setShowModal(true); }} title="Editar Evento" className="p-2 text-gray-200 hover:text-black transition-colors"><Edit2 size={16} /></button>
-                <button onClick={() => exportInscritos(event)} title="Baixar Inscritos" className="p-2 text-gray-200 hover:text-black transition-colors"><Download size={16} /></button>
+                <button onClick={() => { setNewEvent(event); setShowModal(true); }} className="p-2 text-gray-200 hover:text-black transition-colors"><Edit2 size={16} /></button>
+                <button onClick={() => exportInscritos(event)} className="p-2 text-gray-200 hover:text-black transition-colors"><Download size={16} /></button>
                 <button onClick={async () => {
                   if (confirm("Excluir evento?")) {
                     setEvents(events.filter(x => x.id !== event.id));
@@ -327,7 +325,7 @@ const Events: React.FC = () => {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setShowRegModal(event)} className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg">Gerenciar Inscritos</button>
+              <button onClick={() => { setShowRegModal(event); setPFilter('all'); }} className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg">Gerenciar Inscritos</button>
               <button onClick={() => { window.location.hash = `/checkin?checkin=${event.id}`; }} className="py-4 px-5 bg-lime-peregrinas text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all shadow-lg flex items-center gap-1"><QrCode size={14} /> Check-in</button>
             </div>
           </div>
@@ -340,160 +338,158 @@ const Events: React.FC = () => {
         )}
       </div>
 
-      {showRegModal && (() => {
-        return (
-          <div className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center md:p-4 bg-black/60 backdrop-blur-md">
-            <div className="bg-white w-full md:max-w-6xl md:rounded-[2rem] flex flex-col md:max-h-[95vh]">
-              {/* Header */}
-              <div className="flex justify-between items-center p-4 md:p-6 border-b shrink-0">
-                <div className="min-w-0">
-                  <h2 className="text-base md:text-xl font-black uppercase truncate">{showRegModal.nome}</h2>
-                  <p className="text-[11px] font-black uppercase text-lime-600">{showRegModal.participantes.length} Inscritos • {showRegModal.capacidadeMax} vagas</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => exportInscritos(showRegModal)} className="p-2 text-lime-600 hover:bg-lime-50 rounded-xl"><Download size={18} /></button>
-                  <button onClick={() => setShowRegModal(null)} className="p-2 text-gray-400 hover:text-black"><X size={20} /></button>
+      {showRegModal && (
+        <div className="fixed inset-0 z-[100] flex items-stretch md:items-center justify-center md:p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white w-full md:max-w-6xl md:rounded-[2.5rem] flex flex-col md:max-h-[92vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex justify-between items-center p-5 md:p-8 border-b shrink-0 bg-white">
+              <div className="min-w-0">
+                <h2 className="text-lg md:text-2xl font-black uppercase truncate pr-4">{showRegModal.nome}</h2>
+                <div className="flex items-center gap-2 mt-1">
+                   <span className="text-[10px] font-black uppercase bg-lime-400 text-black px-2 py-0.5 rounded-md">{showRegModal.participantes.length} / {showRegModal.capacidadeMax} VAGAS</span>
                 </div>
               </div>
+              <button onClick={() => setShowRegModal(null)} className="p-3 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-all shrink-0"><X size={20} /></button>
+            </div>
 
-              {/* Mobile Tabs */}
-              <div className="flex md:hidden border-b shrink-0">
-                <button onClick={() => setPFilter('all')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${pFilter !== 'confirmed' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
-                  <Users size={14} className="mx-auto mb-1" /> Inscritos
-                </button>
-                <button onClick={() => setPFilter('confirmed')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${pFilter === 'confirmed' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
-                  <UserPlus size={14} className="mx-auto mb-1" /> Cadastrar
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 md:gap-6 p-4 md:p-6">
-
-                  {/* Registration Form - hidden on mobile unless tab selected */}
-                  <div className={`lg:col-span-1 space-y-3 ${pFilter !== 'confirmed' ? 'hidden lg:block' : ''}`}>
-                    <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest border-b pb-2 hidden md:block">Registrar Inscrição</h3>
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
+                
+                {/* Lateral Column: Cadastro & Filtros Mobile */}
+                <div className="lg:col-span-1 p-6 space-y-6 border-b lg:border-b-0 lg:border-r bg-gray-50/50">
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest flex items-center gap-2"><UserPlus size={14} /> Registrar Inscrição</h3>
                     <div className="space-y-3">
                       <Input label="Nome Completo" value={newReg.nome} onChange={(v: any) => setNewReg({ ...newReg, nome: v })} />
                       <div className="grid grid-cols-2 gap-3">
-                        <Input label="E-mail" type="email" value={newReg.email} onChange={(v: any) => setNewReg({ ...newReg, email: v })} />
                         <Input label="WhatsApp" value={newReg.whatsapp} onChange={(v: any) => setNewReg({ ...newReg, whatsapp: v })} />
+                        <Input label="Valor (R$)" type="number" value={newReg.valorInscricao} onChange={(v: any) => setNewReg({ ...newReg, valorInscricao: parseFloat(v) })} />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Select label="Participação" value={newReg.tipoParticipacao} options={['Participante', 'Voluntário', 'Palestrante', 'Equipe']} onChange={(v: any) => setNewReg({ ...newReg, tipoParticipacao: v as any })} />
-                        <Select label="Status" value={newReg.status} options={['Confirmada', 'Pendente', 'Cancelada']} onChange={(v: any) => setNewReg({ ...newReg, status: v as any })} />
-                      </div>
-                      <Input label="Valor (R$)" type="number" value={newReg.valorInscricao} onChange={(v: any) => setNewReg({ ...newReg, valorInscricao: parseFloat(v) })} />
-                      <button
-                        onClick={handleAddRegistration}
-                        disabled={!editingParticipant && showRegModal.participantes.length >= showRegModal.capacidadeMax}
-                        className={`w-full py-3 rounded-2xl shadow-lg font-black uppercase text-xs tracking-widest transition-all ${editingParticipant ? 'bg-black text-white' : 'bg-lime-peregrinas text-black'}`}
+                      <Select label="Status" value={newReg.status} options={['Confirmada', 'Pendente', 'Cancelada']} onChange={(v: any) => setNewReg({ ...newReg, status: v as any })} />
+                      <button 
+                        onClick={handleAddRegistration} 
+                        className={`w-full py-5 rounded-2xl shadow-xl font-black uppercase text-[10px] tracking-widest transition-all ${editingParticipant ? 'bg-black text-white' : 'bg-lime-peregrinas text-black'}`}
                       >
-                        {editingParticipant ? 'Salvar Alterações' : 'Confirmar Inscrição'}
+                        {editingParticipant ? 'Atualizar Dados' : 'Confirmar Inscrição'}
                       </button>
                       {editingParticipant && (
-                        <button onClick={() => { setEditingParticipant(null); setNewReg({ nome: '', email: '', whatsapp: '', valorInscricao: 0, formaIdentificacao: '', tipoParticipacao: 'Participante', status: 'Confirmada' }); }} className="w-full text-[11px] font-black text-gray-400 uppercase">Cancelar Edição</button>
+                         <button onClick={() => { setEditingParticipant(null); setNewReg({ nome: '', email: '', whatsapp: '', valorInscricao: 0, formaIdentificacao: '', tipoParticipacao: 'Participante', status: 'Confirmada' }); }} className="w-full text-[10px] font-black text-gray-400 uppercase py-2">Cancelar Edição</button>
                       )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Participant List - hidden on mobile when form tab is active */}
-                  <div className={`lg:col-span-2 space-y-3 ${pFilter === 'confirmed' ? 'hidden lg:block' : ''}`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="flex gap-1 flex-wrap">
-                        <button onClick={() => setPFilter('all')} className={`text-xs font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-white text-gray-400'}`}>Todos</button>
-                        <button onClick={() => setPFilter('present')} className={`text-xs font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'present' ? 'bg-lime-400 text-black' : 'bg-white text-gray-400'}`}>Presentes</button>
-                        <button onClick={() => setPFilter('absent')} className={`text-xs font-black uppercase px-2 py-1 rounded-lg border ${pFilter === 'absent' ? 'bg-red-50 text-red-500' : 'bg-white text-gray-400'}`}>Ausentes</button>
-                      </div>
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
-                        <input type="text" placeholder="Pesquisar..." className="pl-8 pr-3 py-2 bg-gray-50 rounded-xl text-xs font-bold outline-none w-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                      </div>
+                {/* Main Column: Search and List */}
+                <div className="lg:col-span-2 p-6 space-y-6">
+                  {/* Search Section Reestruturada - CORREÇÃO DO LAYOUT */}
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                      <input 
+                        type="text" 
+                        placeholder="Pesquisar por nome ou ID..." 
+                        className="w-full pl-12 pr-4 py-5 bg-white border-2 border-gray-100 rounded-[1.5rem] text-sm font-bold outline-none focus:border-lime-300 focus:shadow-lg transition-all" 
+                        value={searchTerm} 
+                        onChange={e => setSearchTerm(e.target.value)} 
+                      />
                     </div>
-
-                    <div className="space-y-2">
-                      {filteredParticipants.map(p => (
-                        <div key={p.id} className="p-3 md:p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <button
-                                onClick={() => togglePresence(showRegModal.id, p.id)}
-                                className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-sm border transition-all ${(p as any).presente ? 'bg-lime-400 text-black border-lime-500' : 'bg-white text-gray-300 border-gray-200'}`}
-                              >
-                                {(p as any).presente ? <Check size={14} /> : p.nome.charAt(0)}
-                              </button>
-                              <div className="min-w-0">
-                                <p className="text-sm font-black text-gray-900 truncate">{p.nome}</p>
-                                <div className="flex items-center gap-1 mt-0.5">
-                                  <span className={`text-[10px] font-black uppercase px-1 py-0.5 rounded ${p.status === 'Confirmada' ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-500'}`}>{p.status}</span>
-                                  <span className="text-[10px] font-black text-gray-400 uppercase">{p.tipoParticipacao}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button onClick={() => setShowTicket(p)} className="p-1.5 bg-lime-100 text-lime-700 rounded-lg hover:bg-lime-200 transition-all" title="Ingresso"><QrCode size={14} /></button>
-                              <button onClick={() => handleShareWhatsApp(p, showRegModal)} className="p-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all" title="WhatsApp"><Phone size={14} /></button>
-                              <button onClick={() => { setEditingParticipant(p); setNewReg(p); setPFilter('confirmed'); }} className="p-1.5 text-gray-400 hover:text-black rounded-lg" title="Editar"><Edit2 size={14} /></button>
-                              <button onClick={() => handleDeleteParticipant(showRegModal.id, p.id)} className="p-1.5 text-gray-300 hover:text-red-500 rounded-lg" title="Excluir"><Trash2 size={14} /></button>
-                            </div>
-                          </div>
-                        </div>
+                    
+                    {/* Filtros Horizontais com Scroll */}
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+                      {[
+                        { id: 'all', label: 'Todos', color: 'bg-black text-white' },
+                        { id: 'present', label: 'Presentes', color: 'bg-lime-400 text-black' },
+                        { id: 'absent', label: 'Ausentes', color: 'bg-red-50 text-red-500' },
+                        { id: 'confirmed', label: 'Confirmadas', color: 'bg-green-50 text-green-600' }
+                      ].map(f => (
+                        <button 
+                          key={f.id}
+                          onClick={() => setPFilter(f.id as any)}
+                          className={`whitespace-nowrap px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${pFilter === f.id ? f.color + ' border-transparent shadow-md' : 'bg-white text-gray-400 border-gray-100'}`}
+                        >
+                          {f.label}
+                        </button>
                       ))}
-                      {filteredParticipants.length === 0 && <p className="text-center py-12 text-gray-300 font-black uppercase text-[11px] tracking-widest">Nenhuma inscrição encontrada</p>}
                     </div>
                   </div>
 
+                  {/* List Section */}
+                  <div className="space-y-3 pb-10">
+                    {filteredParticipants.map(p => (
+                      <div key={p.id} className="p-4 bg-white rounded-3xl border-2 border-gray-50 flex items-center justify-between group hover:border-lime-200 transition-all">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <button 
+                            onClick={() => togglePresence(showRegModal.id, p.id)}
+                            className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm border-2 transition-all ${(p as any).presente ? 'bg-lime-400 border-lime-500 text-black' : 'bg-gray-50 border-gray-100 text-gray-300'}`}
+                          >
+                            {(p as any).presente ? <Check size={20} strokeWidth={3} /> : p.nome.charAt(0)}
+                          </button>
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-gray-900 truncate">{p.nome}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${p.status === 'Confirmada' ? 'bg-green-100 text-green-700' : 'bg-red-50 text-red-500'}`}>{p.status}</span>
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">ID: {p.id}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => setShowTicket(p)} className="p-2.5 bg-lime-50 text-lime-700 rounded-xl hover:bg-lime-100 transition-colors"><QrCode size={16} /></button>
+                          <button onClick={() => handleShareWhatsApp(p, showRegModal)} className="p-2.5 bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition-colors"><Phone size={16} /></button>
+                          <button onClick={() => { setEditingParticipant(p); setNewReg(p); }} className="p-2.5 text-gray-300 hover:text-black hover:bg-gray-100 rounded-xl transition-colors"><Edit2 size={16} /></button>
+                        </div>
+                      </div>
+                    ))}
+                    {filteredParticipants.length === 0 && (
+                      <div className="py-20 text-center border-2 border-dashed border-gray-100 rounded-3xl">
+                        <Search size={32} className="mx-auto text-gray-200 mb-2" />
+                        <p className="text-gray-300 font-black uppercase text-[10px] tracking-widest">Nenhuma inscrição encontrada</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
+      {/* Modal Novo Evento */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white w-full max-w-4xl rounded-[3rem] p-10 space-y-8 animate-in max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-4">
-              <h2 className="text-2xl font-black uppercase tracking-tight">Novo Evento Peregrinas</h2>
-              <button onClick={() => setShowModal(false)}><X size={24} /></button>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-4xl rounded-[3rem] p-8 md:p-12 space-y-8 animate-in max-h-[95vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-6">
+              <h2 className="text-2xl font-black uppercase tracking-tight">Configurar Evento</h2>
+              <button onClick={() => setShowModal(false)} className="p-2 bg-gray-100 rounded-xl"><X size={24} /></button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <Input label="Nome do Evento" value={newEvent.nome} onChange={(v: any) => setNewEvent({ ...newEvent, nome: v })} />
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-gray-400">Descrição Completa</label>
-                  <textarea className="w-full p-4 bg-gray-50 rounded-2xl font-bold h-24 text-sm outline-none border-none focus:ring-2 focus:ring-lime-100" value={newEvent.descricao} onChange={e => setNewEvent({ ...newEvent, descricao: e.target.value })} />
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-1">Descrição</label>
+                  <textarea className="w-full p-5 bg-gray-50 rounded-[1.5rem] font-bold h-28 text-sm outline-none focus:ring-2 focus:ring-lime-200" value={newEvent.descricao} onChange={e => setNewEvent({ ...newEvent, descricao: e.target.value })} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="Data de Início" type="date" value={newEvent.dataInicio} onChange={(v: any) => setNewEvent({ ...newEvent, dataInicio: v })} />
-                  <Input label="Data de Término" type="date" value={newEvent.dataTermino} onChange={(v: any) => setNewEvent({ ...newEvent, dataTermino: v })} />
+                  <Input label="Início" type="date" value={newEvent.dataInicio} onChange={(v: any) => setNewEvent({ ...newEvent, dataInicio: v })} />
+                  <Input label="Fim" type="date" value={newEvent.dataTermino} onChange={(v: any) => setNewEvent({ ...newEvent, dataTermino: v })} />
                 </div>
-                <Input label="Horário de Início" type="time" value={newEvent.horario} onChange={(v: any) => setNewEvent({ ...newEvent, horario: v })} />
               </div>
               <div className="space-y-4">
-                <Input label="Local / Endereço / Link" value={newEvent.local} onChange={(v: any) => setNewEvent({ ...newEvent, local: v })} />
+                <Input label="Local / Endereço" value={newEvent.local} onChange={(v: any) => setNewEvent({ ...newEvent, local: v })} />
                 <div className="grid grid-cols-2 gap-4">
-                  <Select label="Tipo de Evento" value={newEvent.tipo} options={['Presencial', 'Online', 'Híbrido']} onChange={(v: any) => setNewEvent({ ...newEvent, tipo: v as any })} />
                   <Select label="Categoria" value={newEvent.categoria} options={['Congresso', 'Encontro', 'Treinamento', 'Social', 'Outros']} onChange={(v: any) => setNewEvent({ ...newEvent, categoria: v as any })} />
+                  <Input label="Vagas" type="number" value={newEvent.capacidadeMax} onChange={(v: any) => setNewEvent({ ...newEvent, capacidadeMax: parseInt(v) })} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="Capacidade Máxima" type="number" value={newEvent.capacidadeMax} onChange={(v: any) => setNewEvent({ ...newEvent, capacidadeMax: parseInt(v) })} />
-                  <Input label="Investimento (R$)" type="number" value={newEvent.valorPadrao} onChange={(v: any) => setNewEvent({ ...newEvent, valorPadrao: parseFloat(v) })} />
-                </div>
+                <Input label="Valor da Inscrição (R$)" type="number" value={newEvent.valorPadrao} onChange={(v: any) => setNewEvent({ ...newEvent, valorPadrao: parseFloat(v) })} />
                 <Select label="Status Inicial" value={newEvent.status} options={['Ativo', 'Encerrado', 'Cancelado']} onChange={(v: any) => setNewEvent({ ...newEvent, status: v as any })} />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[9px] font-black uppercase text-gray-400">Observações Estratégicas</label>
-              <textarea className="w-full p-4 bg-gray-50 rounded-2xl font-bold h-20 text-sm outline-none border-none focus:ring-2 focus:ring-lime-100" value={newEvent.observacoes} onChange={e => setNewEvent({ ...newEvent, observacoes: e.target.value })} />
-            </div>
-
-            <div className="flex gap-4 pt-4 border-t">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-4 font-black text-gray-400 uppercase text-xs tracking-widest">DESCARTAR</button>
+            <div className="flex gap-4 pt-6 border-t">
+              <button onClick={() => setShowModal(false)} className="flex-1 py-5 font-black text-gray-400 uppercase text-[10px] tracking-widest">CANCELAR</button>
               <button onClick={async () => {
-                if (!newEvent.nome) return alert("Preencha o nome!");
+                if (!newEvent.nome) return alert("Nome é obrigatório!");
                 try {
                   if (newEvent.id) {
                     const updated = events.map(e => e.id === newEvent.id ? newEvent as Event : e);
@@ -504,61 +500,42 @@ const Events: React.FC = () => {
                   }
                   setShowModal(false);
                   setNewEvent(initialEvent);
-                } catch (err) {
-                  // Do nothing, UI rollback handled by user retrying manually
-                }
-              }} className="flex-1 py-4 bg-lime-peregrinas text-black font-black rounded-2xl shadow-xl uppercase text-xs tracking-widest">{newEvent.id ? 'SALVAR ALTERAÇÕES' : 'CRIAR EVENTO AGORA'}</button>
+                } catch (err) {}
+              }} className="flex-2 py-5 bg-lime-peregrinas text-black font-black rounded-2xl shadow-xl uppercase text-[10px] tracking-widest px-10">SALVAR EVENTO</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Ingresso / QR Modal */}
       {showTicket && showRegModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="bg-lime-400 p-8 text-center space-y-2 relative">
-              <button onClick={() => setShowTicket(null)} className="absolute top-4 right-4 text-black/50 hover:text-black"><X size={20} /></button>
-              <div className="w-16 h-1 w-8 mx-auto bg-black/10 rounded-full mb-4"></div>
-              <h2 className="text-xl font-black uppercase text-black leading-tight">{showRegModal.nome}</h2>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-black/60">Ingresso Digital</p>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-white w-full max-w-sm rounded-[3rem] overflow-hidden animate-in zoom-in-95">
+            <div className="bg-lime-400 p-8 text-center relative">
+              <button onClick={() => setShowTicket(null)} className="absolute top-4 right-4"><X size={20} /></button>
+              <h2 className="text-xl font-black uppercase text-black">{showRegModal.nome}</h2>
+              <p className="text-[10px] font-bold uppercase text-black/50">Ingresso Digital</p>
             </div>
-            <div className="p-8 space-y-8">
-              <div className="flex justify-center bg-white p-4 rounded-3xl border-2 border-dashed border-gray-100">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?data=${showTicket.id}&size=200x200`}
-                  alt="QR Code"
-                  className="w-48 h-48"
-                />
+            <div className="p-10 space-y-8">
+              <div className="flex justify-center bg-white p-6 rounded-[2rem] border-2 border-dashed border-gray-100">
+                <img src={`https://api.qrserver.com/v1/create-qr-code/?data=${showTicket.id}&size=200x200`} alt="QR Code" className="w-48 h-48" />
               </div>
-              <div className="space-y-4">
-                <div className="text-center">
-                  <p className="text-lg font-black text-gray-900">{showTicket.nome}</p>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{showTicket.tipoParticipacao} • {showTicket.id}</p>
-                </div>
-                <div className="pt-4 space-y-3">
-                  <button
-                    onClick={() => handleShareWhatsApp(showTicket, showRegModal)}
-                    className="w-full py-4 bg-[#25D366] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg"
-                  >
-                    <Phone size={14} /> Enviar p/ WhatsApp
-                  </button>
-                  <button onClick={() => window.print()} className="w-full py-4 bg-gray-100 text-gray-600 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-200 transition-all">
-                    <Download size={14} /> Baixar Ingresso
-                  </button>
-                </div>
+              <div className="text-center">
+                <p className="text-xl font-black text-gray-900">{showTicket.nome}</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase mt-1">ID: {showTicket.id}</p>
               </div>
-            </div>
-            <div className="bg-gray-50 p-4 text-center">
-              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Apresente este QR Code na entrada do evento</p>
+              <button onClick={() => handleShareWhatsApp(showTicket, showRegModal)} className="w-full py-5 bg-[#25D366] text-white rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-2 shadow-lg">
+                <Phone size={16} /> Enviar WhatsApp
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {emailStatus !== 'idle' && (
-        <div className="fixed bottom-10 right-10 z-[100] bg-black text-white px-8 py-5 rounded-3xl flex items-center gap-4 shadow-2xl animate-in slide-in-from-right-10 border border-lime-500/30">
+        <div className="fixed bottom-10 right-6 left-6 md:left-auto md:w-80 z-[200] bg-black text-white px-8 py-6 rounded-[2rem] flex items-center gap-4 shadow-2xl animate-in slide-in-from-bottom-10 border border-lime-500/30">
           {emailStatus === 'sending' ? <Loader2 className="animate-spin text-lime-400" size={20} /> : <CheckCircle2 className="text-lime-400" size={20} />}
-          <span className="text-[10px] font-black uppercase tracking-widest">{emailStatus === 'sending' ? 'Processando Registro...' : 'Inscrição Confirmada!'}</span>
+          <span className="text-[10px] font-black uppercase tracking-widest">{emailStatus === 'sending' ? 'Registrando...' : 'Sucesso!'}</span>
         </div>
       )}
     </div>
@@ -568,14 +545,14 @@ const Events: React.FC = () => {
 const Input = ({ label, type = "text", value, onChange }: any) => (
   <div className="space-y-1">
     <label className="text-[9px] font-black uppercase text-gray-400 ml-1">{label}</label>
-    <input type={type} className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none border-none focus:ring-2 focus:ring-lime-100" value={value || ''} onChange={e => onChange(e.target.value)} />
+    <input type={type} className="w-full p-4 md:p-5 bg-white border-2 border-gray-50 rounded-2xl font-bold text-sm outline-none focus:border-lime-200 focus:bg-white transition-all" value={value || ''} onChange={e => onChange(e.target.value)} />
   </div>
 );
 
 const Select = ({ label, options, value, onChange }: any) => (
   <div className="space-y-1">
     <label className="text-[9px] font-black uppercase text-gray-400 ml-1">{label}</label>
-    <select className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none border-none focus:ring-2 focus:ring-lime-100" value={value} onChange={e => onChange(e.target.value)}>
+    <select className="w-full p-4 md:p-5 bg-white border-2 border-gray-50 rounded-2xl font-bold text-sm outline-none focus:border-lime-200 transition-all" value={value} onChange={e => onChange(e.target.value)}>
       {options.map((o: any) => <option key={o} value={o}>{o}</option>)}
     </select>
   </div>
