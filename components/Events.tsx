@@ -338,10 +338,9 @@ const Events: React.FC = () => {
       </div>
 
       {showRegModal && (() => {
-        const [mobileTab, setMobileTab] = [pFilter === 'all' || pFilter === 'present' || pFilter === 'absent' ? 'list' as const : 'form' as const, (v: string) => { }];
         return (
-          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 backdrop-blur-md">
-            <div className="bg-white w-full md:max-w-6xl rounded-t-3xl md:rounded-[2rem] flex flex-col" style={{ maxHeight: '95vh' }}>
+          <div className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center md:p-4 bg-black/60 backdrop-blur-md">
+            <div className="bg-white w-full md:max-w-6xl md:rounded-[2rem] flex flex-col md:max-h-[95vh]">
               {/* Header */}
               <div className="flex justify-between items-center p-4 md:p-6 border-b shrink-0">
                 <div className="min-w-0">
