@@ -170,7 +170,7 @@ const MuralComunhao: React.FC<MuralComunhaoProps> = ({ userProfile }) => {
                 <div className="flex items-center gap-4">
                     <div className="w-1.5 h-16 bg-lime-peregrinas rounded-full"></div>
                     <div>
-                        <h2 className="text-3xl font-black uppercase tracking-tighter text-gray-900 leading-none">Mural de Comunhão</h2>
+                        <h2 className="text-[22px] font-extrabold tracking-tight leading-tight uppercase text-gray-900">Mural de Comunhão</h2>
                         <p className="text-sm font-black uppercase text-gray-400 tracking-[0.2em] mt-2 flex items-center gap-2">
                             <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                             Ao Vivo

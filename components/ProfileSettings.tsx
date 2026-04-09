@@ -137,7 +137,7 @@ const ProfileSettings: React.FC = () => {
             <Flower2 size={16} />
           </div>
         </div>
-        <h2 className="text-2xl font-black uppercase tracking-tight text-gray-900">{profileData.nome}</h2>
+        <h2 className="text-[22px] font-extrabold tracking-tight leading-tight uppercase text-gray-900">{profileData.nome}</h2>
         <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mt-1">{user?.role} • Geração de Luz</p>
       </div>
 

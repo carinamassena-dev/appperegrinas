@@ -584,7 +584,7 @@ const Disciples: React.FC = () => {
     <div className="space-y-4 animate-in pb-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
         <div className="text-left">
-          <h1 className="text-2xl md:text-3xl font-black uppercase text-gray-900 leading-tight flex items-center gap-4">
+          <h1 className="text-[22px] font-extrabold tracking-tight leading-tight uppercase text-gray-900 flex items-center gap-4">
             Peregrinas
             <span className="bg-gray-100 text-gray-400 px-3 py-1 rounded-lg text-[10px] font-black tabular-nums">
               Total: {totalCount}

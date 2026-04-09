@@ -275,7 +275,7 @@ const Events: React.FC = () => {
     <div className="space-y-8 animate-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black uppercase">Eventos & Inscrições</h1>
+          <h1 className="text-[22px] font-extrabold tracking-tight leading-tight uppercase text-gray-900">Eventos & Inscrições</h1>
           <p className="text-gray-400 font-medium italic">Logística e controle de acessos da Rede</p>
         </div>
         <div className="flex gap-3">

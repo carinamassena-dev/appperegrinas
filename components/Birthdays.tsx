@@ -81,7 +81,7 @@ const Birthdays: React.FC = () => {
     return (
         <div className="space-y-8 animate-in pb-20 text-left">
             <header>
-                <h1 className="text-3xl font-black uppercase tracking-tight text-gray-900 leading-tight">Aniversariantes</h1>
+                <h1 className="text-[22px] font-extrabold tracking-tight leading-tight uppercase text-gray-900">Aniversariantes</h1>
                 <p className="text-gray-400 font-bold text-xs uppercase tracking-widest">Celebração e Comunhão</p>
             </header>
 

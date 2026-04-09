@@ -3,7 +3,7 @@ import { AuthContext, AuthContextType } from '../App';
 import { Calendar, Plus, Save, X, RefreshCw, User, FileText, CheckCircle, Search, ShieldCheck, Image as ImageIcon, DownloadCloud } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { supabaseService } from '../services/supabaseService';
-import { loadDisciplesList } from '../services/dataService';
+import { loadDisciplesList, searchDisciplesByName } from '../services/dataService';
 import imageCompression from 'browser-image-compression';
 
 interface OneOnOneMeeting {
@@ -25,7 +25,13 @@ export const OneOnOne: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [loadingDisciples, setLoadingDisciples] = useState(true);
+    const [loadingDisciples, setLoadingDisciples] = useState(false);
+
+    // Picker Search State
+    const [pickerSearch, setPickerSearch] = useState('');
+    const [pickerResults, setPickerResults] = useState<any[]>([]);
+    const [isSearchingPicker, setIsSearchingPicker] = useState(false);
+    const [showPickerResults, setShowPickerResults] = useState(false);
 
     // Form State
     const [selectedDisciple, setSelectedDisciple] = useState('');
@@ -59,10 +65,10 @@ export const OneOnOne: React.FC = () => {
     };
 
     const fetchDisciples = async () => {
+        // We only load initial list if needed, but we'll prioritize search
         setLoadingDisciples(true);
         try {
-            const list = await loadDisciplesList();
-            // Fallback: se a lista vier com a estrutura record.nome, ou já planificada (id, nome)
+            const list = await loadDisciplesList(0, 10); // Load just a few initially
             const mappedList = list.map((item: any) => ({
                 id: item.id,
                 nome: item.nome || item.record?.nome || 'Sem Nome'
@@ -74,6 +80,30 @@ export const OneOnOne: React.FC = () => {
             setLoadingDisciples(false);
         }
     };
+
+    // Advanced Picker Search logic
+    useEffect(() => {
+        if (pickerSearch.length < 3) {
+            setPickerResults([]);
+            setShowPickerResults(false);
+            return;
+        }
+
+        const handler = setTimeout(async () => {
+            setIsSearchingPicker(true);
+            try {
+                const results = await searchDisciplesByName(pickerSearch);
+                setPickerResults(results);
+                setShowPickerResults(true);
+            } catch (err) {
+                console.error("Erro na busca do picker:", err);
+            } finally {
+                setIsSearchingPicker(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(handler);
+    }, [pickerSearch]);
 
     const fetchFullMeeting = async (id: string) => {
         if (!user?.sessionToken) return;
@@ -185,7 +215,7 @@ export const OneOnOne: React.FC = () => {
         <div className="space-y-6 animate-in">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-black uppercase tracking-tighter text-gray-900 flex items-center gap-2">
+                    <h2 className="text-[22px] font-extrabold tracking-tight leading-tight uppercase text-gray-900 flex items-center gap-2">
                         <ShieldCheck className="text-lime-peregrinas" />
                         One-on-one
                     </h2>
@@ -324,18 +354,65 @@ export const OneOnOne: React.FC = () => {
 
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
+                                <div className="space-y-2 md:col-span-1">
                                     <label className="text-xs font-bold uppercase text-gray-500 ml-1">Discípula</label>
-                                    <select
-                                        value={selectedDisciple}
-                                        onChange={(e) => setSelectedDisciple(e.target.value)}
-                                        className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 font-medium focus:ring-2 focus:ring-lime-peregrinas"
-                                    >
-                                        <option value="">{loadingDisciples ? 'Carregando discípulas...' : 'Selecione a discípula...'}</option>
-                                        {disciples.map(d => (
-                                            <option key={d.id} value={d.id}>{d.nome}</option>
-                                        ))}
-                                    </select>
+                                    {!selectedDisciple ? (
+                                        <div className="relative">
+                                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                            <input
+                                                type="text"
+                                                placeholder="Digite 3 letras para buscar..."
+                                                value={pickerSearch}
+                                                onChange={(e) => setPickerSearch(e.target.value)}
+                                                className="w-full bg-gray-50 border-none rounded-xl pl-12 pr-4 py-3 font-medium focus:ring-2 focus:ring-lime-peregrinas"
+                                            />
+                                            {isSearchingPicker && <div className="absolute right-4 top-1/2 -translate-y-1/2"><RefreshCw size={16} className="animate-spin text-lime-600" /></div>}
+
+                                            {showPickerResults && pickerResults.length > 0 && (
+                                                <div className="absolute left-0 right-0 mt-2 bg-white border rounded-2xl shadow-2xl z-[70] max-h-60 overflow-y-auto overflow-x-hidden animate-in fade-in slide-in-from-top-2">
+                                                    {pickerResults.map(d => (
+                                                        <div
+                                                            key={d.id}
+                                                            onClick={() => {
+                                                                setSelectedDisciple(d.id);
+                                                                setPickerSearch('');
+                                                                setShowPickerResults(false);
+                                                                // Also add to local disciples list if not present so getDiscipleName works
+                                                                if (!disciples.find(x => x.id === d.id)) {
+                                                                    setDisciples(prev => [...prev, d]);
+                                                                }
+                                                            }}
+                                                            className="p-4 hover:bg-lime-50 cursor-pointer border-b last:border-none flex items-center justify-between group transition-colors"
+                                                        >
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-gray-900 group-hover:text-black">{d.nome}</span>
+                                                                {d.lider && <span className="text-[10px] uppercase font-black text-gray-400 group-hover:text-gray-500">Líder: {d.lider}</span>}
+                                                            </div>
+                                                            <Plus size={16} className="text-gray-200 group-hover:text-lime-600" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {showPickerResults && pickerResults.length === 0 && (
+                                                <div className="absolute left-0 right-0 mt-2 bg-white border rounded-2xl shadow-xl z-[70] p-4 text-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                                    Nenhuma discípula encontrada
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-between bg-lime-50 border-2 border-lime-200 rounded-xl px-4 py-3">
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-black text-sm">{getDiscipleName(selectedDisciple)}</span>
+                                                <span className="text-[8px] font-black uppercase text-lime-600">Discípula Selecionada</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setSelectedDisciple('')}
+                                                className="p-1 hover:bg-white rounded-lg transition-colors text-lime-700"
+                                            >
+                                                <X size={18} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold uppercase text-gray-500 ml-1">Data</label>

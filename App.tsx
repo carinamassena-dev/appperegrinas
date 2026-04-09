@@ -433,7 +433,7 @@ const App: React.FC = () => {
                         <div className="w-10 h-10 bg-lime-peregrinas rounded-xl flex items-center justify-center shadow-lg">
                           <Flower2 size={22} className="text-black" />
                         </div>
-                        <span className="font-black text-lg uppercase tracking-tighter">Peregrinas</span>
+                        <span className="text-[22px] font-extrabold tracking-tight leading-tight uppercase text-gray-900">Peregrinas</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <DraftIndicator />
@@ -451,7 +451,7 @@ const App: React.FC = () => {
                             <div className="w-12 h-12 bg-lime-peregrinas rounded-2xl flex items-center justify-center shadow-xl">
                               <Flower2 size={24} />
                             </div>
-                            <h1 className="font-black text-xl tracking-tighter uppercase">Menu Geral</h1>
+                            <h1 className="text-[22px] font-extrabold tracking-tight leading-tight uppercase text-gray-900">Menu Geral</h1>
                           </div>
                           <button onClick={() => setIsSidebarOpen(false)} className="p-3 bg-gray-100 rounded-2xl"><X size={24} /></button>
                         </div>

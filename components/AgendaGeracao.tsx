@@ -146,17 +146,17 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
     return (
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden font-sans relative pb-8">
             {/* Header Institucional */}
-            <div className="bg-black p-6 text-white flex justify-between items-center border-b-[6px] border-lime-peregrinas">
-                <button onClick={() => setMesAtual(subMonths(mesAtual, 1))} className="hover:text-lime-peregrinas transition-colors p-2">
+            <div className="bg-white p-6 flex justify-between items-center border-b border-gray-100">
+                <button onClick={() => setMesAtual(subMonths(mesAtual, 1))} className="hover:bg-gray-100 transition-colors p-2 rounded-full">
                     <ChevronLeft />
                 </button>
                 <div className="text-center">
-                    <h2 className="text-xl font-black tracking-tight uppercase">
+                    <h2 className="text-[22px] font-extrabold tracking-tight leading-tight uppercase text-gray-900">
                         {format(mesAtual, 'MMMM yyyy', { locale: ptBR })}
                     </h2>
-                    <p className="text-[10px] text-lime-400 font-bold uppercase tracking-widest mt-1">Agenda da Geração</p>
+                    <p className="text-[10px] text-lime-600 font-bold uppercase tracking-widest mt-1">Agenda da Geração</p>
                 </div>
-                <button onClick={() => setMesAtual(addMonths(mesAtual, 1))} className="hover:text-lime-peregrinas transition-colors p-2">
+                <button onClick={() => setMesAtual(addMonths(mesAtual, 1))} className="hover:bg-gray-100 transition-colors p-2 rounded-full">
                     <ChevronRight />
                 </button>
             </div>

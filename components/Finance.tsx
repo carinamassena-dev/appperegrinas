@@ -253,7 +253,7 @@ const Finance: React.FC = () => {
     <div className="space-y-6 md:space-y-8 animate-in pb-10">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black uppercase text-gray-900">Caixa da Geração</h1>
+          <h1 className="text-[22px] font-extrabold tracking-tight leading-tight uppercase text-gray-900">Caixa da Geração</h1>
           <p className="text-gray-400 italic font-medium text-xs md:text-sm">Gestão financeira transparente e organizada</p>
         </div>
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
@@ -439,9 +439,27 @@ const Finance: React.FC = () => {
                 <input type="text" className="w-full p-3 md:p-4 bg-gray-50 rounded-2xl font-bold outline-none text-sm" value={entry.responsavel} onChange={e => setEntry({ ...entry, responsavel: e.target.value })} />
               </div>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Descrição</label>
+                <input type="text" className="w-full p-3 md:p-4 bg-gray-50 rounded-2xl font-bold outline-none text-sm" value={entry.descricao} onChange={e => setEntry({ ...entry, descricao: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Categoria</label>
+                <select className="w-full p-3 md:p-4 bg-gray-50 rounded-2xl font-bold outline-none text-sm" value={entry.categoria} onChange={e => setEntry({ ...entry, categoria: e.target.value })}>
+                  <option value="">Selecione...</option>
+                  <option>Dízimo</option>
+                  <option>Oferta</option>
+                  <option>Social</option>
+                  <option>Aluguel / Fixa</option>
+                  <option>Outras Entradas</option>
+                  <option>Outras Saídas</option>
+                </select>
+              </div>
+            </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Descrição</label>
-              <input type="text" className="w-full p-3 md:p-4 bg-gray-50 rounded-2xl font-bold outline-none text-sm" value={entry.descricao} onChange={e => setEntry({ ...entry, descricao: e.target.value })} />
+              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Observações Adicionais</label>
+              <textarea className="w-full p-3 md:p-4 bg-gray-50 rounded-2xl font-bold outline-none text-sm h-20" value={entry.observacao} onChange={e => setEntry({ ...entry, observacao: e.target.value })} placeholder="Detalhes da transação..." />
             </div>
             <div className="flex gap-4 pt-4">
               <button onClick={() => setShowModal(false)} className="flex-1 font-black text-gray-400 uppercase text-[10px] tracking-widest py-4">Cancelar</button>
