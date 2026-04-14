@@ -17,7 +17,7 @@ export enum CDLevel {
   NAO_INICIOU = 'Não Iniciou'
 }
 
-export type PermissionLevel = 'view' | 'edit' | 'none';
+export type PermissionLevel = 'view' | 'edit' | 'delete' | 'none';
 
 export interface UserPermissions {
   dashboard: PermissionLevel;
@@ -26,6 +26,16 @@ export interface UserPermissions {
   finance: PermissionLevel;
   events: PermissionLevel;
   harvest: PermissionLevel;
+  tickets: PermissionLevel;
+  mural: PermissionLevel;
+  agenda: PermissionLevel;
+  feed: PermissionLevel;
+  reports: PermissionLevel;
+  academy: PermissionLevel;
+  atas: PermissionLevel;
+  mapa: PermissionLevel;
+  one_on_one: PermissionLevel;
+  amigo_secreto: PermissionLevel;
   master: boolean;
 }
 

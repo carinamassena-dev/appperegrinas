@@ -34,7 +34,7 @@ import { NotificationBell } from './components/NotificationBell';
 import { DraftIndicator } from './components/DraftIndicator';
 import { OneOnOne } from './components/OneOnOne';
 import { IdleProtector } from './components/IdleProtector';
-import { UserAccount } from './types';
+import { UserAccount, UserPermissions } from './types';
 import MasterEditModal from './components/MasterEditModal';
 import { applyThemeToDOM, loadConfigFromSupabase } from './services/uiConfigService';
 import { loadData, saveRecord } from './services/dataService';
@@ -59,23 +59,56 @@ export const AuthContext = createContext<AuthContextType>({
   updateProfile: () => { }
 });
 
+/**
+ * Standardized permission check helper.
+ * Master users (user.permissions.master === true) satisfy all checks.
+ */
+export const hasPermission = (user: UserAccount | null, module: keyof UserPermissions, level: 'view' | 'edit' | 'delete' = 'view'): boolean => {
+  if (!user || !user.permissions) return false;
+  if (user.permissions.master) return true;
+  
+  const userLevel = user.permissions[module];
+  if (userLevel === 'none' || !userLevel) return false;
+  if (level === 'view') return true; // Already checked it's not 'none'
+  if (level === 'edit') return userLevel === 'edit' || userLevel === 'delete';
+  if (level === 'delete') return userLevel === 'delete';
+  
+  return false;
+};
+
+
 // Default permissions based on role
-const getDefaultPermissions = (role?: string) => {
+const getDefaultPermissions = (role?: string): UserPermissions => {
   if (role === 'Master') {
     return {
-      dashboard: 'edit', disciples: 'edit', leaders: 'edit',
-      finance: 'edit', events: 'edit', harvest: 'edit', master: true
+      dashboard: 'delete', disciples: 'delete', leaders: 'delete',
+      finance: 'delete', events: 'delete', harvest: 'delete',
+      tickets: 'delete', mural: 'delete', agenda: 'delete',
+      feed: 'delete', reports: 'delete', academy: 'delete',
+      atas: 'delete', mapa: 'delete', one_on_one: 'delete',
+      amigo_secreto: 'delete',
+      master: true
     };
   }
   if (role === 'Líder') {
     return {
       dashboard: 'view', disciples: 'edit', leaders: 'view',
-      finance: 'view', events: 'view', harvest: 'edit', master: false
+      finance: 'view', events: 'view', harvest: 'edit',
+      tickets: 'view', mural: 'view', agenda: 'view',
+      feed: 'view', reports: 'view', academy: 'view',
+      atas: 'edit', mapa: 'view', one_on_one: 'none',
+      amigo_secreto: 'edit',
+      master: false
     };
   }
   return {
     dashboard: 'view', disciples: 'view', leaders: 'none',
-    finance: 'none', events: 'view', harvest: 'view', master: false
+    finance: 'none', events: 'view', harvest: 'view',
+    tickets: 'view', mural: 'view', agenda: 'view',
+    feed: 'view', reports: 'none', academy: 'view',
+    atas: 'none', mapa: 'none', one_on_one: 'none',
+    amigo_secreto: 'none',
+    master: false
   };
 };
 
@@ -148,7 +181,7 @@ const validateSession = async (user: UserAccount | null) => {
   }
 };
 
-const ProtectedRoute = ({ children, requireRole, requireEmail = true }: { children: React.ReactNode, requireRole?: string, requireEmail?: boolean }) => {
+const ProtectedRoute = ({ children, requirePermission, requireMaster = false, requireEmail = true }: { children: React.ReactNode, requirePermission?: keyof UserPermissions, requireMaster?: boolean, requireEmail?: boolean }) => {
   const { user, logout } = useContext(AuthContext);
   const [isValidating, setIsValidating] = useState(true);
   const [isAuth, setIsAuth] = useState(false);
@@ -189,14 +222,22 @@ const ProtectedRoute = ({ children, requireRole, requireEmail = true }: { childr
     return <Navigate to="/completar-perfil" replace />;
   }
 
-  if (requireRole && user?.role !== requireRole && user?.role !== 'Master') {
+  // Master Override
+  if (user?.role === 'Master' || user?.permissions?.master) {
+    return <>{children}</>;
+  }
+
+  if (requireMaster && !user?.permissions?.master) {
     return <Navigate to="/" replace />;
   }
 
-
+  if (requirePermission && !hasPermission(user, requirePermission, 'view')) {
+    return <Navigate to="/" replace />;
+  }
 
   return <>{children}</>;
 };
+
 
 const CompleteProfile = () => {
   const { user, updateProfile } = useContext(AuthContext);
@@ -333,8 +374,12 @@ const App: React.FC = () => {
             whatsapp: '71900000000',
             role: 'Master',
             permissions: {
-              dashboard: 'edit', disciples: 'edit', leaders: 'edit',
-              finance: 'edit', events: 'edit', harvest: 'edit', master: true
+              dashboard: 'delete', disciples: 'delete', leaders: 'delete',
+              finance: 'delete', events: 'delete', harvest: 'delete',
+              tickets: 'delete', mural: 'delete', agenda: 'delete',
+              feed: 'delete', reports: 'delete', academy: 'delete',
+              atas: 'delete', mapa: 'delete', one_on_one: 'delete',
+              master: true
             }
           };
           await saveRecord('users', master);
@@ -373,10 +418,12 @@ const App: React.FC = () => {
 
   const NavItem = ({ to, icon: Icon, label, permission, highlight = false }: any) => {
     if (!user) return null;
-    const perms = user.permissions || {} as any;
-    const userPerm = (perms as any)[permission];
-    if (userPerm === 'none' && permission !== 'master' && permission !== 'profile') return null;
-    if (permission === 'master' && !perms.master) return null;
+    
+    // Especial rules for master admin and profile
+    if (permission === 'master' && !user.permissions?.master) return null;
+    if (permission === 'profile') { /* always allowed if logged in */ }
+    else if (!hasPermission(user, permission, 'view')) return null;
+
 
     const location = useLocation();
     const isActive = location.pathname === to;
@@ -462,26 +509,24 @@ const App: React.FC = () => {
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Discipulado</div>
                           <NavItem to="/discipulas" icon={Users} label="Peregrinas" permission="disciples" />
                           <NavItem to="/aniversariantes" icon={Gift} label="Aniversários" permission="disciples" />
-                          <NavItem to="/one_on_one" icon={ShieldCheck} label="One-on-one (Sigiloso)" permission="leaders" />
-                          <NavItem to="/mapa" icon={MapPin} label="Mapa GPS" permission="leaders" />
+                          <NavItem to="/one_on_one" icon={ShieldCheck} label="One-on-one (Sigiloso)" permission="one_on_one" />
+                          <NavItem to="/mapa" icon={MapPin} label="Mapa GPS" permission="mapa" />
                           <NavItem to="/colheita" icon={Sprout} label="Colheita" permission="harvest" />
-                          {(user.role === 'Master' || user.role === 'Líder') && (
-                            <NavItem to="/amigo-secreto" icon={Gift} label="Amigo Secreto" permission="dashboard" />
-                          )}
+                          <NavItem to="/amigo-secreto" icon={Gift} label="Amigo Secreto" permission="amigo_secreto" />
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Gestão</div>
                           <NavItem to="/eventos" icon={Calendar} label="Eventos" permission="events" />
                           <NavItem to="/checkin" icon={QrCode} label="Check-in QR" permission="events" />
-                          <NavItem to="/cursos" icon={GraduationCap} label="Acadêmico" permission="disciples" />
-                          <NavItem to="/atas" icon={ClipboardList} label="Atas de Célula" permission="leaders" />
+                          <NavItem to="/cursos" icon={GraduationCap} label="Acadêmico" permission="academy" />
+                          <NavItem to="/atas" icon={ClipboardList} label="Atas de Célula" permission="atas" />
                           <NavItem to="/financeiro" icon={DollarSign} label="Financeiro" permission="finance" />
-                          <NavItem to="/calculadora" icon={Calculator} label="Calculadora" permission="dashboard" />
-                          <NavItem to="/relatorios" icon={BarChart3} label="Relatórios" permission="dashboard" />
+                          <NavItem to="/calculadora" icon={Calculator} label="Calculadora" permission="finance" />
+                          <NavItem to="/relatorios" icon={BarChart3} label="Relatórios" permission="reports" />
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Ouvidoria</div>
-                          <NavItem to="/tickets" icon={MessageSquarePlus} label="Chamados & Tickets" permission="dashboard" />
+                          <NavItem to="/tickets" icon={MessageSquarePlus} label="Chamados & Tickets" permission="tickets" />
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Conteúdo</div>
-                          <NavItem to="/mural" icon={MessageSquare} label="Mural de Comunhão" permission="dashboard" />
-                          <NavItem to="/agenda" icon={Calendar} label="Agenda da Geração" permission="dashboard" />
-                          <NavItem to="/feed" icon={BookOpen} label="Feed Palavras" permission="dashboard" />
+                          <NavItem to="/mural" icon={MessageSquare} label="Mural de Comunhão" permission="mural" />
+                          <NavItem to="/agenda" icon={Calendar} label="Agenda da Geração" permission="agenda" />
+                          <NavItem to="/feed" icon={BookOpen} label="Feed Palavras" permission="feed" />
                           <div className="pt-6 pb-2 text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] ml-5">Configurações</div>
                           <NavItem to="/perfil" icon={UserCircle} label="Meu Perfil" permission="profile" />
                           {user.permissions?.master && <NavItem to="/admin" icon={ShieldCheck} label="Master Admin" permission="master" />}
@@ -499,36 +544,39 @@ const App: React.FC = () => {
 
                     {isSidebarOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] lg:hidden" onClick={() => setIsSidebarOpen(false)} />}
 
-                    <main className="flex-1 overflow-x-hidden md:p-8 lg:p-12 pt-10 md:pt-14 lg:pt-16">
-                      <div className="max-w-7xl mx-auto px-4 md:px-0 pt-6 md:pt-0">
-                        <Routes>
-                          <Route path="/" element={<Home />} />
-                          <Route path="/completar-perfil" element={<CompleteProfile />} />
-                          <Route path="/dashboard" element={<Dashboard />} />
-                          <Route path="/discipulas" element={<Disciples />} />
-                          <Route path="/aniversariantes" element={<Birthdays />} />
-                          <Route path="/one_on_one" element={<OneOnOne />} />
-                          <Route path="/mapa" element={<CellMap />} />
-                          <Route path="/colheita" element={<HarvestView />} />
-                          <Route path="/financeiro" element={<Finance />} />
-                          <Route path="/calculadora" element={<TitheCalculator />} />
-                          <Route path="/eventos" element={<Events />} />
-                          <Route path="/relatorios" element={<Reports />} />
-                          <Route path="/checkin" element={<CheckIn />} />
-                          <Route path="/tickets" element={<Tickets />} />
-                          <Route path="/feed" element={<Feed />} />
-                          <Route path="/mural" element={<MuralComunhao userProfile={user} />} />
-                          <Route path="/agenda" element={<AgendaGeracao userRole={user.role} />} />
-                          <Route path="/cursos" element={<CoursesControl />} />
-                          <Route path="/atas" element={<CellMeetings />} />
-                          <Route path="/perfil" element={<ProfileSettings />} />
-                          <Route path="/amigo-secreto" element={<AmigoSecreto />} />
-                          {user.permissions?.master && <Route path="/admin" element={<AdminPanel />} />}
-                          {user.email === 'carina.massena@gmail.com' && <Route path="/super-admin" element={<SuperAdminPanel />} />}
-                          <Route path="*" element={<Navigate to="/" />} />
-                        </Routes>
-                      </div>
+                    <main className="flex-1 p-4 md:p-8 lg:p-12 overflow-x-hidden md:max-w-[calc(100vw-320px)] mx-auto w-full">
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/discipulas" element={<ProtectedRoute requirePermission="disciples"><Disciples /></ProtectedRoute>} />
+                        <Route path="/aniversariantes" element={<ProtectedRoute requirePermission="disciples"><Birthdays /></ProtectedRoute>} />
+                        <Route path="/one_on_one" element={<ProtectedRoute requirePermission="one_on_one"><OneOnOne /></ProtectedRoute>} />
+                        <Route path="/mapa" element={<ProtectedRoute requirePermission="mapa"><CellMap /></ProtectedRoute>} />
+                        <Route path="/colheita" element={<ProtectedRoute requirePermission="harvest"><HarvestView /></ProtectedRoute>} />
+                        <Route path="/financeiro" element={<ProtectedRoute requirePermission="finance"><Finance /></ProtectedRoute>} />
+                        <Route path="/calculadora" element={<ProtectedRoute requirePermission="finance"><TitheCalculator /></ProtectedRoute>} />
+                        <Route path="/eventos" element={<ProtectedRoute requirePermission="events"><Events /></ProtectedRoute>} />
+                        <Route path="/relatorios" element={<ProtectedRoute requirePermission="reports"><Reports /></ProtectedRoute>} />
+                        <Route path="/checkin" element={<ProtectedRoute requirePermission="events"><CheckIn /></ProtectedRoute>} />
+                        <Route path="/tickets" element={<ProtectedRoute requirePermission="tickets"><Tickets /></ProtectedRoute>} />
+                        <Route path="/feed" element={<ProtectedRoute requirePermission="feed"><Feed /></ProtectedRoute>} />
+                        <Route path="/mural" element={<ProtectedRoute requirePermission="mural"><MuralComunhao userProfile={user} /></ProtectedRoute>} />
+                        <Route path="/agenda" element={<ProtectedRoute requirePermission="agenda"><AgendaGeracao userRole={user.role as any} userPermissions={user.permissions} /></ProtectedRoute>} />
+                        <Route path="/cursos" element={<ProtectedRoute requirePermission="academy"><CoursesControl /></ProtectedRoute>} />
+                        <Route path="/atas" element={<ProtectedRoute requirePermission="atas"><CellMeetings /></ProtectedRoute>} />
+                        <Route path="/perfil" element={<ProfileSettings />} />
+                        <Route path="/amigo-secreto" element={<ProtectedRoute requirePermission="amigo_secreto"><AmigoSecreto /></ProtectedRoute>} />
+                        <Route path="/admin" element={<ProtectedRoute requireMaster={true}><AdminPanel /></ProtectedRoute>} />
+                        <Route path="/super-admin" element={
+                          user.email === 'carina.massena@gmail.com' 
+                            ? <ProtectedRoute requireEmail={false}><SuperAdminPanel /></ProtectedRoute> 
+                            : <Navigate to="/" />
+                        } />
+                        <Route path="/completar-perfil" element={<CompleteProfile />} />
+                        <Route path="*" element={<Navigate to="/" />} />
+                      </Routes>
                     </main>
+
 
                     <div className="hidden md:flex fixed top-12 right-6 z-[150] items-center gap-4">
                       <DraftIndicator />
@@ -563,6 +611,7 @@ const App: React.FC = () => {
         </div>
       </HashRouter>
     </AuthContext.Provider>
+
   );
 };
 

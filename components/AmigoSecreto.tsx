@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { Gift, Search, Send, CheckCircle, RefreshCcw, Loader2, ArrowRight } from 'lucide-react';
-import { AuthContext } from '../App';
+import { AuthContext, hasPermission } from '../App';
+
 import { supabaseService } from '../services/supabaseService';
 import { getHistoricoSorteiosAmigoSecreto, saveAmigoSecretoBatch, loadDisciplesForAmigoSecreto } from '../services/dataService';
 import { Disciple } from '../types';
@@ -62,6 +63,10 @@ export const AmigoSecreto: React.FC = () => {
     };
 
     const handleSortear = async () => {
+        if (!hasPermission(user as any, 'amigo_secreto', 'edit')) {
+            return alert("Você não possui permissão para realizar o sorteio.");
+        }
+
         if (selectedIds.size < 3) {
             return alert("Selecione pelo menos 3 participantes para o amigo secreto.");
         }
@@ -69,6 +74,7 @@ export const AmigoSecreto: React.FC = () => {
         if (!confirm(`Confirmar o sorteio entre as ${selectedIds.size} participantes selecionadas? Os links definitivos serão gerados e não poderão ser alterados.`)) {
             return;
         }
+
 
         setIsDrawing(true);
 
@@ -117,6 +123,10 @@ export const AmigoSecreto: React.FC = () => {
     };
 
     const handleSendWhatsApp = (nome: string, telefone: string, token: string) => {
+        if (!hasPermission(user as any, 'amigo_secreto', 'edit')) {
+            return alert("Você não possui permissão para enviar o link.");
+        }
+
         const url = `${window.location.origin}/#/revelar?id=${token}`;
         const number = cleanNumber(telefone);
 

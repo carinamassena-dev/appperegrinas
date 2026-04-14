@@ -8,7 +8,8 @@ import {
   ChevronRight, Info, CalendarDays, LayoutGrid, Loader2, AlertCircle, Folder, ChevronDown, ChevronUp, Link, MailCheck
 } from 'lucide-react';
 import useSWR from 'swr';
-import { AuthContext } from '../App';
+import { AuthContext, hasPermission } from '../App';
+
 import { draftService } from '../services/draftService';
 import { sendDataToSheet } from '../services/googleSheetsService';
 import { loadDisciplesList, loadDiscipleFull, saveRecord, deleteRecord, loadData, saveAttendanceBatch, searchDisciplesByName, loadLinhagem } from '../services/dataService';
@@ -527,9 +528,10 @@ const Disciples: React.FC = () => {
   };
 
   const handleExportExcel = async () => {
-    if (user?.role !== 'Master') {
-      return alert("Esse download só é permitido para o usuário master.");
+    if (!hasPermission(user, 'reports', 'view')) {
+      return alert("Você não possui permissão para extrair relatórios.");
     }
+
     try {
       // Re-fetch everything for export to bypass pagination limits
       const { supabaseService } = await import('../services/supabaseService');
@@ -558,9 +560,10 @@ const Disciples: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    if (user?.role !== 'Master') {
-      return alert("Esse download só é permitido para o usuário master.");
+    if (!hasPermission(user, 'reports', 'view')) {
+      return alert("Você não possui permissão para extrair relatórios.");
     }
+
     try {
       const { supabaseService } = await import('../services/supabaseService');
       const allData = await supabaseService.getDisciplesGlobalLightweight();
@@ -613,9 +616,15 @@ const Disciples: React.FC = () => {
             )}
           </button>
 
-          <button onClick={() => { setEditId(null); setNewDisciple(initialDisciple); setShowModal(true); }} className="flex-1 md:flex-none bg-black text-white px-6 py-4 rounded-xl font-black text-xs uppercase shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
+          <button onClick={() => { 
+            if (!hasPermission(user, 'disciples', 'edit')) return alert("Você não tem permissão para adicionar peregrinas.");
+            setEditId(null); 
+            setNewDisciple(initialDisciple); 
+            setShowModal(true); 
+          }} className="flex-1 md:flex-none bg-black text-white px-6 py-4 rounded-xl font-black text-xs uppercase shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
             <UserPlus size={18} /> Novo
           </button>
+
         </div>
       </div>
 
@@ -720,9 +729,10 @@ const Disciples: React.FC = () => {
                     if (btn) btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>';
                   }}
                   onDelete={async () => {
-                    if (user?.email !== 'carina.massena@gmail.com' && user?.role !== 'Master') {
-                      return alert("Apenas a Usuária Master pode excluir fichas.");
+                    if (!hasPermission(user, 'disciples', 'delete')) {
+                      return alert("Você não possui permissão para excluir fichas.");
                     }
+
                     if (confirm("Deseja realmente excluir esta ficha permanentemente?")) {
                       mutate(disciples.filter(x => x.id !== d.id), false);
                       await deleteRecord('disciples', d.id);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
-import { AuthContext } from '../App';
+import { AuthContext, hasPermission } from '../App';
 import { loadData, saveRecord, getDiscipleByName } from '../services/dataService';
 import { Ticket, TicketMessage, TicketStatus, TicketType } from '../types';
 import { MessageSquarePlus, Clock, CheckCircle2, Search, X, MessageCircle, Send, Plus, Filter, AlertCircle, Bookmark, UserCircle, Trash2, Image as ImageIcon } from 'lucide-react';
@@ -99,7 +99,8 @@ export const Tickets: React.FC = () => {
         }
     };
 
-    const isLeaderOrMaster = currentUser?.role === 'Master' || currentUser?.role === 'Líder';
+    const canManageTickets = hasPermission(currentUser, 'tickets', 'edit');
+
 
     const displayedTickets = useMemo(() => {
         let filtered = tickets.filter(t => {
@@ -109,13 +110,13 @@ export const Tickets: React.FC = () => {
             const matchesStatus = filterStatus === 'all' || t.status === filterStatus;
 
             // Regra de visibilidade baseada no usuário logado
-            const matchesVisibility = isLeaderOrMaster ? true : t.creatorId === currentUser?.id;
+            const matchesVisibility = canManageTickets ? true : t.creatorId === currentUser?.id;
 
             return matchesSearch && matchesStatus && matchesVisibility;
         });
 
         return filtered.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    }, [tickets, searchTerm, filterStatus, currentUser, isLeaderOrMaster]);
+    }, [tickets, searchTerm, filterStatus, currentUser, canManageTickets]);
 
     const handleSaveTicket = async () => {
         if (!newTicket.type) return;
@@ -274,9 +275,9 @@ export const Tickets: React.FC = () => {
 
         // Atualiza status se um líder responder a um ticket aberto
         let newStatus = selectedTicket.status;
-        if (isLeaderOrMaster && selectedTicket.creatorId !== currentUser?.id && selectedTicket.status === 'Aberto') {
+        if (canManageTickets && selectedTicket.creatorId !== currentUser?.id && selectedTicket.status === 'Aberto') {
             newStatus = 'Respondido';
-        } else if (!isLeaderOrMaster && selectedTicket.status === 'Respondido') {
+        } else if (!canManageTickets && selectedTicket.status === 'Respondido') {
             newStatus = 'Aberto'; // Volta para aberto se o criador respondeu
         }
 
@@ -379,8 +380,8 @@ export const Tickets: React.FC = () => {
                     </div>
                 ) : (
                     displayedTickets.map((ticket) => {
-                        const isUnreadForCreator = !isLeaderOrMaster && (ticket.status === 'Respondido' || ticket.status === 'Em Andamento');
-                        const isUnreadForLeader = isLeaderOrMaster && ticket.status === 'Aberto';
+                        const isUnreadForCreator = !canManageTickets && (ticket.status === 'Respondido' || ticket.status === 'Em Andamento');
+                        const isUnreadForLeader = canManageTickets && ticket.status === 'Aberto';
                         const showPulse = isUnreadForCreator || isUnreadForLeader;
 
                         return (
@@ -443,7 +444,7 @@ export const Tickets: React.FC = () => {
 
 
                         {/* Actions (Líder/Master) */}
-                        {isLeaderOrMaster && (
+                        {canManageTickets && (
                             <div className="px-6 py-3 bg-white border-b border-gray-100 flex flex-wrap md:flex-nowrap gap-2 items-center">
                                 <span className="text-[10px] font-black uppercase text-gray-400 py-2 w-full md:w-auto">Alterar Status:</span>
                                 {['Em Andamento', 'Respondido', 'Concluído'].map(s => (

@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { AuthContext, hasPermission } from '../App';
+
 import { MessageSquare, Pin, Send, Trash2, Edit2, MessageCircle, Heart, User, Check, Flame, Star } from 'lucide-react';
 import { UserAccount } from '../types';
 import { loadData, saveRecord } from '../services/dataService';
@@ -113,9 +115,11 @@ const MuralComunhao: React.FC<MuralComunhaoProps> = ({ userProfile }) => {
     };
 
     const excluirPost = async (id: string, autor: string) => {
-        if (autor !== userProfile.nome && userProfile.role !== 'Master' && userProfile.role !== 'Líder') {
+        const canDelete = autor === userProfile.nome || hasPermission(userProfile as any, 'mural', 'delete');
+        if (!canDelete) {
             return alert("Sem permissão para excluir.");
         }
+
         if (!confirm("Deletar post permanentemente?")) return;
         try {
             const { supabaseService } = await import('../services/supabaseService');
@@ -211,8 +215,9 @@ const MuralComunhao: React.FC<MuralComunhaoProps> = ({ userProfile }) => {
                                     </div>
                                     <div className="flex gap-2">
                                         {post.is_fixed && <Pin size={16} className="text-lime-600 fill-lime-600" />}
-                                        {(post.autor === userProfile.nome || userProfile.role === 'Master') && (
+                                        {(post.autor === userProfile.nome || hasPermission(userProfile as any, 'mural', 'edit')) && (
                                             <div className="flex gap-1">
+
                                                 <button onClick={() => { setEditandoPostId(post.id); setTextoEditado(post.conteudo); }} className="p-1.5 text-gray-300 hover:bg-gray-50 rounded-lg"><Edit2 size={14} /></button>
                                                 <button onClick={() => excluirPost(post.id, post.autor)} className="p-1.5 text-gray-300 hover:bg-red-50 hover:text-red-500 rounded-lg"><Trash2 size={14} /></button>
                                             </div>

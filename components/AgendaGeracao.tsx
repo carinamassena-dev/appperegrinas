@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useContext } from 'react';
+import { AuthContext, hasPermission } from '../App';
+
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, MapPin, Clock, Trash2, Edit2, X, AlertCircle } from 'lucide-react';
 import {
     format, addMonths, subMonths, startOfMonth, endOfMonth,
@@ -19,10 +21,12 @@ export interface AgendaEvento {
 }
 
 interface AgendaGeracaoProps {
-    userRole: 'Master' | 'Líder' | 'Operador';
 }
 
-const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
+
+const AgendaGeracao: React.FC<AgendaGeracaoProps> = () => {
+    const { user } = useContext(AuthContext)!;
+
     const [mesAtual, setMesAtual] = useState(new Date());
     const [eventos, setEventos] = useState<AgendaEvento[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -120,6 +124,10 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
 
     const handleDelete = async () => {
         if (!selectedEvent) return;
+        if (!hasPermission(user, 'agenda', 'delete')) {
+            return alert("Você não possui permissão para excluir na agenda.");
+        }
+
         if (!confirm(`Remover definitivamente o evento "${selectedEvent.titulo}"?`)) return;
 
         const { deleteRecord } = await import('../services/dataService');
@@ -205,7 +213,8 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
                             </div>
 
                             {/* Botão de Adicionar */}
-                            {(userRole === 'Master' || userRole === 'Líder') && (
+                            {hasPermission(user, 'agenda', 'edit') && (
+
                                 <button
                                     onClick={() => openCreateModal(dia)}
                                     className="w-full mt-2 opacity-0 group-hover:opacity-100 flex justify-center text-gray-300 hover:text-lime-600 transition-all pb-1"
@@ -256,7 +265,8 @@ const AgendaGeracao: React.FC<AgendaGeracaoProps> = ({ userRole }) => {
                                     </div>
                                 </div>
 
-                                {(userRole === 'Master' || userRole === 'Líder') && (
+                                {hasPermission(user, 'agenda', 'edit') && (
+
                                     <div className="flex gap-3 pt-2">
                                         <button onClick={openEditModal} className="flex-1 bg-gray-100 text-gray-900 py-3 rounded-xl font-black text-xs uppercase hover:bg-gray-200 flex items-center justify-center gap-2 transition-colors">
                                             <Edit2 size={16} /> Editar

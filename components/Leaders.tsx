@@ -10,6 +10,9 @@ import { Leader, Disciple } from '../types';
 import { sendDataToSheet } from '../services/googleSheetsService';
 import { loadData, saveRecord, deleteRecord, loadDisciplesList } from '../services/dataService';
 import { supabaseService } from '../services/supabaseService';
+import { AuthContext, hasPermission } from '../App';
+import { useContext } from 'react';
+
 
 declare const L: any;
 
@@ -24,6 +27,7 @@ const Leaders: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [activeCellTab, setActiveCellTab] = useState<'cel1' | 'cel2'>('cel1');
   const [visiblePinsCount, setVisiblePinsCount] = useState(0);
+  const { user } = useContext(AuthContext)!;
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -257,9 +261,16 @@ const Leaders: React.FC = () => {
             {profileOptions.map(opt => <option key={opt} value={opt}>{opt === 'Todos' ? 'Todos os Perfis' : opt}</option>)}
           </select>
         </div>
-        <button onClick={() => { setEditId(null); setNewLeader(initialLeader); setShowModal(true); setActiveCellTab('cel1'); }} className="md:col-span-3 bg-black text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all">
+        <button onClick={() => { 
+          if (!hasPermission(user, 'leaders', 'edit')) return alert("Você não possui permissão para adicionar líderes.");
+          setEditId(null); 
+          setNewLeader(initialLeader); 
+          setShowModal(true); 
+          setActiveCellTab('cel1'); 
+        }} className="md:col-span-3 bg-black text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all">
           <UserPlus size={18} /> Adicionar Líder
         </button>
+
       </div>
 
       {viewMode === 'list' ? (
@@ -316,8 +327,28 @@ const Leaders: React.FC = () => {
               </div>
 
               <div className="flex gap-2 mt-auto pt-4 border-t border-gray-50">
-                <button onClick={() => { setEditId(l.id); setNewLeader(l); setShowModal(true); setActiveCellTab('cel1'); }} className="flex-1 py-3 bg-gray-50 rounded-xl text-gray-400 hover:text-black transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase"><Edit2 size={14} /> Editar</button>
-                <button onClick={async () => { if (confirm("Excluir?")) { const up = disciples.filter(x => x.id !== l.id); setDisciples(up); setLeaders(up.filter(d => d.isLeader) as Leader[]); await deleteRecord('disciples', l.id); } }} className="flex-1 py-3 bg-red-50 rounded-xl text-red-200 hover:text-red-500 transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase"><Trash2 size={14} /> Excluir</button>
+                <button onClick={() => { 
+                  if (!hasPermission(user, 'leaders', 'edit')) return alert("Você não possui permissão para editar líderes.");
+                  setEditId(l.id); 
+                  setNewLeader(l); 
+                  setShowModal(true); 
+                  setActiveCellTab('cel1'); 
+                }} className="flex-1 py-3 bg-gray-50 rounded-xl text-gray-400 hover:text-black transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase"><Edit2 size={14} /> Editar</button>
+
+                <button onClick={async () => {
+                  if (!hasPermission(user, 'leaders', 'delete')) {
+                    return alert("Você não possui permissão para excluir líderes.");
+                  }
+
+                  if (confirm("Excluir?")) {
+                    const up = disciples.filter(x => x.id !== l.id);
+                    setDisciples(up);
+                    setLeaders(up.filter(d => d.isLeader) as Leader[]);
+                    await deleteRecord('disciples', l.id);
+                  }
+                }} className="flex-1 py-3 bg-red-50 rounded-xl text-red-200 hover:text-red-500 transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase">
+                  <Trash2 size={14} /> Excluir
+                </button>
               </div>
             </div>
           ))}

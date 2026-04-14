@@ -5,7 +5,12 @@ import { FinanceRecord, TransactionType } from '../types';
 import { draftService } from '../services/draftService';
 import { loadData, saveRecord, deleteRecord } from '../services/dataService';
 
+import { AuthContext, hasPermission } from '../App';
+import { useContext } from 'react';
+
+
 const Finance: React.FC = () => {
+  const { user } = useContext(AuthContext)!;
   const [records, setRecords] = useState<FinanceRecord[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -142,7 +147,11 @@ const Finance: React.FC = () => {
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!hasPermission(user, 'finance', 'edit')) {
+      return alert("Você não possui permissão para importar dados.");
+    }
     const file = e.target.files?.[0];
+
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -173,7 +182,11 @@ const Finance: React.FC = () => {
   };
 
   const handleExportCSV = () => {
+    if (!hasPermission(user, 'finance', 'view')) {
+      return alert("Você não possui permissão para exportar dados.");
+    }
     const headers = "Data,Tipo,Valor,Responsavel,Descricao,Categoria,Observacao\n";
+
     const csvContent = filtered.map(r =>
       `"${r.data}","${r.tipo}","${r.valor.toFixed(2)}","${r.responsavel}","${r.descricao}","${r.categoria || ''}","${r.observacao || ''}"`
     ).join('\n');
@@ -266,7 +279,13 @@ const Finance: React.FC = () => {
           >
             <Download size={16} /> Exportar
           </button>
-          <button onClick={() => { setEditId(null); setEntry(initialEntry); setShowModal(true); }} className="flex-1 md:flex-none bg-black text-white px-4 md:px-6 py-3 md:py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl active:scale-95 transition-all">Novo Lançamento</button>
+          <button onClick={() => { 
+            if (!hasPermission(user, 'finance', 'edit')) return alert("Você não possui permissão para novos lançamentos.");
+            setEditId(null); 
+            setEntry(initialEntry); 
+            setShowModal(true); 
+          }} className="flex-1 md:flex-none bg-black text-white px-4 md:px-6 py-3 md:py-4 rounded-2xl font-black text-[10px] uppercase shadow-xl active:scale-95 transition-all">Novo Lançamento</button>
+
         </div>
       </div>
 
@@ -352,8 +371,18 @@ const Finance: React.FC = () => {
                     {r.tipo === TransactionType.ENTRADA ? '+' : '-'} R$ {r.valor.toFixed(2)}
                   </td>
                   <td className="px-8 py-4 flex gap-2 justify-end">
-                    <button onClick={() => { setEditId(r.id); setEntry(r); setShowModal(true); }} className="text-gray-300 hover:text-black p-2 transition-colors"><Edit2 size={16} /></button>
+                    <button onClick={() => { 
+                      if (!hasPermission(user, 'finance', 'edit')) return alert("Você não possui permissão para editar lançamentos.");
+                      setEditId(r.id); 
+                      setEntry(r); 
+                      setShowModal(true); 
+                    }} className="text-gray-300 hover:text-black p-2 transition-colors"><Edit2 size={16} /></button>
+
                     <button onClick={async () => {
+                      if (!hasPermission(user, 'finance', 'delete')) {
+                        return alert("Você não possui permissão para excluir lançamentos.");
+                      }
+
                       if (confirm("Excluir registro permanentemente?")) {
                         const up = records.filter(x => x.id !== r.id);
                         saveToStorage(up);
@@ -396,6 +425,9 @@ const Finance: React.FC = () => {
                 <div className="flex gap-1">
                   <button onClick={() => { setEditId(r.id); setEntry(r); setShowModal(true); }} className="p-2 text-gray-300 active:text-black"><Edit2 size={14} /></button>
                   <button onClick={async () => {
+                    if (user?.permissions?.finance !== 'delete') {
+                      return alert("Você não possui permissão para excluir lançamentos.");
+                    }
                     if (confirm("Excluir?")) {
                       const up = records.filter(x => x.id !== r.id);
                       saveToStorage(up);

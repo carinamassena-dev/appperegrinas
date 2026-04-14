@@ -14,6 +14,26 @@ import { supabaseService } from '../services/supabaseService';
 import { loadData, saveRecord, deleteRecord, loadDisciplesList, generateFullSystemBackup, restoreFromBackup } from '../services/dataService';
 import { useNavigate } from 'react-router-dom';
 
+const MODULES = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'disciples', label: 'Peregrinas' },
+  { id: 'leaders', label: 'Líderes' },
+  { id: 'finance', label: 'Financeiro' },
+  { id: 'events', label: 'Eventos' },
+  { id: 'harvest', label: 'Colheita' },
+  { id: 'tickets', label: 'Chamados' },
+  { id: 'mural', label: 'Mural' },
+  { id: 'agenda', label: 'Agenda' },
+  { id: 'feed', label: 'Feed' },
+  { id: 'reports', label: 'Relatórios' },
+  { id: 'academy', label: 'Acadêmico' },
+  { id: 'atas', label: 'Atas' },
+  { id: 'mapa', label: 'Mapa' },
+  { id: 'one_on_one', label: '1-on-1' },
+  { id: 'amigo_secreto', label: 'Amigo Secreto' }
+];
+
+
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useContext(AuthContext);
@@ -170,7 +190,7 @@ const AdminPanel: React.FC = () => {
     setUsers(prev => prev.map(u => {
       if (u.id !== id) return u;
       const currentPermissions = u.permissions || {
-        dashboard: 'none', disciples: 'none', leaders: 'none', finance: 'none', events: 'none', harvest: 'none', master: false
+        dashboard: 'none', disciples: 'none', leaders: 'none', finance: 'none', events: 'none', harvest: 'none', tickets: 'none', mural: 'none', agenda: 'none', feed: 'none', reports: 'none', academy: 'none', atas: 'none', mapa: 'none', one_on_one: 'none', master: false
       };
       return {
         ...u,
@@ -188,7 +208,7 @@ const AdminPanel: React.FC = () => {
     return matchUser && matchType && matchStart && matchEnd;
   });
 
-  if (!currentUser || currentUser.role !== 'Master') {
+  if (!currentUser || !currentUser.permissions?.master) {
     return (
       <div className="p-12 text-center">
         <h1 className="text-2xl font-black text-red-500 uppercase">Acesso Restrito</h1>
@@ -234,7 +254,7 @@ const AdminPanel: React.FC = () => {
 
       {activeTab === 'users' && (
         <div className="space-y-6 text-left animate-in fade-in">
-          <button onClick={() => { setEditingUser({ nome: '', username: '', role: 'Discípula', permissions: { dashboard: 'view', disciples: 'view', leaders: 'none', finance: 'none', events: 'none', harvest: 'view' } }); setShowUserModal(true); }} className="w-full md:w-auto bg-black text-white px-8 py-5 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all">
+          <button onClick={() => { setEditingUser({ nome: '', username: '', role: 'Discípula', permissions: { dashboard: 'view', disciples: 'view', leaders: 'none', finance: 'none', events: 'none', harvest: 'view', tickets: 'view', mural: 'view', agenda: 'view', feed: 'view', reports: 'none', academy: 'none', atas: 'none', mapa: 'none', one_on_one: 'none', amigo_secreto: 'none', master: false } }); setShowUserModal(true); }} className="w-full md:w-auto bg-black text-white px-8 py-5 rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all">
             <UserPlus size={20} /> Adicionar Novo Usuário
           </button>
 
@@ -320,14 +340,7 @@ const AdminPanel: React.FC = () => {
                   <div className="lg:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-inner">
                     <h4 className="text-[10px] font-black uppercase text-gray-900 tracking-tighter border-b pb-3 mb-4">Acesso aos Módulos</h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {[
-                        { id: 'dashboard', label: 'Dashboard' },
-                        { id: 'disciples', label: 'Peregrinas' },
-                        { id: 'leaders', label: 'Líderes' },
-                        { id: 'finance', label: 'Financeiro' },
-                        { id: 'events', label: 'Eventos' },
-                        { id: 'harvest', label: 'Colheita' }
-                      ].map((module) => (
+                      {MODULES.map((module) => (
                         <div key={module.id} className="space-y-1.5">
                           <label className="text-[9px] font-black uppercase text-gray-400">{module.label}</label>
                           <select
@@ -338,10 +351,12 @@ const AdminPanel: React.FC = () => {
                             <option value="none">Bloqueado</option>
                             <option value="view">Visualizar</option>
                             <option value="edit">Editar</option>
+                            <option value="delete">Excluir</option>
                           </select>
                         </div>
                       ))}
                     </div>
+
                   </div>
                 </div>
               ))}
@@ -454,10 +469,42 @@ const AdminPanel: React.FC = () => {
                 <label className="text-[10px] font-black uppercase text-gray-400">Poder de Acesso (Role)</label>
                 <div className="flex gap-2">
                   {['Master', 'Líder', 'Discípula'].map(r => (
-                    <button key={r} onClick={() => setEditingUser({ ...editingUser, role: r })} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editingUser.role === r ? 'bg-black text-white border-black' : 'border-gray-100 text-gray-400'}`}>{r}</button>
+                    <button key={r} onClick={() => {
+                        const newRole = r as any;
+                        const perms = editingUser.permissions || {};
+                        if (newRole === 'Master') perms.master = true;
+                        else if (newRole === 'Discípula') perms.master = false;
+                        setEditingUser({ ...editingUser, role: newRole, permissions: perms });
+                    }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${editingUser.role === r ? 'bg-black text-white border-black' : 'border-gray-100 text-gray-400'}`}>{r}</button>
                   ))}
                 </div>
               </div>
+
+              <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                <h4 className="text-[10px] font-black uppercase text-gray-900 tracking-tighter border-b pb-3 mb-4">Configurar Permissões Granulares</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {MODULES.map((module) => (
+                    <div key={module.id} className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-gray-400">{module.label}</label>
+                      <select
+                        className="w-full p-2.5 bg-white rounded-lg font-bold text-[10px] outline-none border border-gray-200 focus:border-black transition-all"
+                        value={(editingUser.permissions?.[module.id as keyof typeof editingUser.permissions] as string) || 'none'}
+                        onChange={(e) => {
+                          const perms = { ...(editingUser.permissions || {}) };
+                          (perms as any)[module.id] = e.target.value;
+                          setEditingUser({ ...editingUser, permissions: perms });
+                        }}
+                      >
+                        <option value="none">Bloqueado</option>
+                        <option value="view">Visualizar</option>
+                        <option value="edit">Editar</option>
+                        <option value="delete">Excluir</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
 
               <div className="pt-6 border-t flex gap-4">
                 <button onClick={() => setShowUserModal(false)} className="flex-1 py-4 font-black text-gray-400 uppercase text-xs">Cancelar</button>
